@@ -1,74 +1,232 @@
-"""
-Utility tools for the Treasury Reconciliation Agent
+"""Tools for extracting structured information from treasury documents."""
 
-This module provides helper functions for:
-- Data processing and validation
-- Exchange rate conversion
-- Transaction matching algorithms
-- Report generation
-"""
+from __future__ import annotations
 
-def convert_currency(amount: float, from_rate: float, to_rate: float) -> float:
-    """
-    Convert amount between currencies using exchange rates.
-    
-    Args:
-        amount: Amount to convert
-        from_rate: Exchange rate from source currency
-        to_rate: Exchange rate to target currency
-    
-    Returns:
-        Converted amount
-    """
-    pass
+import re
+from pathlib import Path
+from typing import Any
 
-def match_transactions(received_amount: float, invoice_amount: float, tolerance: float) -> bool:
-    """
-    Check if transactions match within tolerance threshold.
-    
-    Args:
-        received_amount: Amount received
-        invoice_amount: Original invoice amount
-        tolerance: Acceptable variance percentage
-    
-    Returns:
-        True if match within tolerance, False otherwise
-    """
-    pass
+import pandas as pd
 
-def validate_transaction_data(df) -> tuple:
-    """
-    Validate transaction data structure.
-    
-    Args:
-        df: Pandas DataFrame with transaction data
-    
-    Returns:
-        Tuple of (is_valid: bool, errors: list)
-    """
-    pass
 
-def calculate_discrepancy(expected: float, actual: float) -> dict:
-    """
-    Calculate discrepancy metrics.
-    
-    Args:
-        expected: Expected amount
-        actual: Actual amount received
-    
-    Returns:
-        Dictionary with discrepancy analysis
-    """
-    pass
+_AMOUNT_COLUMNS = (
+    "invoice_amount",
+    "total_amount",
+    "grand_total",
+    "amount_paid",
+    "amount",
+    "total",
+)
+_CURRENCY_COLUMNS = ("invoice_currency", "currency", "ccy")
+_ID_COLUMNS = ("invoice_id", "invoice_number", "reference", "ref")
+_DATE_COLUMNS = ("invoice_date", "date", "payment_date")
+_SUPPORTED_SUFFIXES = {".csv", ".xlsx", ".pdf", ".txt", ".md"}
 
-def generate_report(results: list) -> str:
+_CURRENCY_TOKEN = r"(?:MYR|RM|USD|US\$|\$|EUR|€|SGD|S\$|GBP|£)"
+_NUMBER_TOKEN = r"[0-9][0-9,]*(?:\.[0-9]{1,2})?"
+
+
+def extract_invoice_data(file_path: str) -> dict[str, Any]:
+    """Extract an invoice total and currency from a PDF, spreadsheet, or text file.
+
+    The returned dictionary is safe for an agent tool call: failures are returned
+    as structured results instead of crashing the workflow.
     """
-    Generate reconciliation report.
-    
-    Args:
-        results: List of reconciliation results
-    
-    Returns:
-        Formatted report string
-    """
-    pass
+    path = Path(file_path)
+
+    if not path.exists():
+        return _failure(f"Invoice file not found: {path}")
+    if path.suffix.lower() not in _SUPPORTED_SUFFIXES:
+        supported = ", ".join(sorted(_SUPPORTED_SUFFIXES))
+        return _failure(f"Unsupported invoice type '{path.suffix}'. Use: {supported}.")
+
+    try:
+        if path.suffix.lower() in {".csv", ".xlsx"}:
+            result = _extract_from_table(_read_table(path))
+        else:
+            result = _extract_from_text(_read_document_text(path))
+    except (OSError, ValueError, ImportError) as exc:
+        return _failure(str(exc))
+
+    if result is None:
+        return _failure(
+            "Could not find an invoice total and currency. Include fields such as "
+            "'Total: USD 100.00' or columns named 'amount' and 'currency'."
+        )
+
+    amount, currency, invoice_id, invoice_date = result
+    return {
+        "success": True,
+        "source_file": path.name,
+        "source_format": path.suffix.lower().lstrip("."),
+        "invoice_id": invoice_id,
+        "invoice_date": invoice_date,
+        "amount": amount,
+        "currency": currency,
+        # These aliases align with the current AgentState field names.
+        "invoice_amount": amount,
+        "invoice_currency": currency,
+    }
+
+
+def _read_table(path: Path) -> pd.DataFrame:
+    if path.suffix.lower() == ".csv":
+        return pd.read_csv(path)
+    return pd.read_excel(path)
+
+
+def _read_document_text(path: Path) -> str:
+    if path.suffix.lower() in {".txt", ".md"}:
+        return path.read_text(encoding="utf-8")
+
+    if path.suffix.lower() == ".pdf":
+        try:
+            from pypdf import PdfReader
+        except ImportError as exc:
+            raise ImportError(
+                "PDF extraction requires pypdf. Install project requirements first."
+            ) from exc
+        pages = [page.extract_text() or "" for page in PdfReader(str(path)).pages]
+        return "\n".join(pages)
+
+    raise ValueError(
+        "Image OCR is not enabled in this prototype. Use a text-based PDF, CSV, or Excel invoice."
+    )
+
+
+def _extract_from_table(
+    frame: pd.DataFrame,
+) -> tuple[float, str, str | None, str | None] | None:
+    if frame.empty:
+        return None
+
+    normalized = {_normalize_column(column): column for column in frame.columns}
+    amount_column = _select_column(normalized, _AMOUNT_COLUMNS)
+    currency_column = _select_column(normalized, _CURRENCY_COLUMNS)
+
+    if amount_column and currency_column:
+        for _, row in frame.iterrows():
+            amount = _parse_number(row[amount_column])
+            currency = _normalize_currency(str(row[currency_column]))
+            if amount is not None and currency:
+                return (
+                    amount,
+                    currency,
+                    _row_value(row, normalized, _ID_COLUMNS),
+                    _row_value(row, normalized, _DATE_COLUMNS),
+                )
+
+    table_text = "\n".join(
+        " ".join(str(value) for value in row if pd.notna(value))
+        for row in frame.itertuples(index=False, name=None)
+    )
+    return _extract_from_text(table_text)
+
+
+def _extract_from_text(
+    text: str,
+) -> tuple[float, str, str | None, str | None] | None:
+    currency_first_pattern = re.compile(
+        rf"(?P<prefix>{_CURRENCY_TOKEN})\s*(?P<amount>{_NUMBER_TOKEN})",
+        re.IGNORECASE,
+    )
+
+    match = None
+    for label in (
+        r"grand\s+total",
+        r"total\s+due",
+        r"invoice\s+total",
+        r"amount\s+paid",
+        r"total",
+        r"amount",
+    ):
+        labelled_pattern = re.compile(
+            rf"(?<![A-Za-z]){label}\s*[:=-]?\s*(?P<prefix>{_CURRENCY_TOKEN})?\s*"
+            rf"(?P<amount>{_NUMBER_TOKEN})\s*(?P<suffix>{_CURRENCY_TOKEN})?",
+            re.IGNORECASE,
+        )
+        match = labelled_pattern.search(text)
+        if match:
+            break
+
+    match = match or currency_first_pattern.search(text)
+    if not match:
+        return None
+
+    amount = _parse_number(match.group("amount"))
+    currency_token = match.groupdict().get("prefix") or match.groupdict().get("suffix")
+    currency = _normalize_currency(currency_token or "") or _currency_in_text(text)
+    if amount is None or currency is None:
+        return None
+
+    return amount, currency, _extract_invoice_id(text), _extract_date(text)
+
+
+def _select_column(columns: dict[str, Any], candidates: tuple[str, ...]) -> Any | None:
+    for candidate in candidates:
+        if candidate in columns:
+            return columns[candidate]
+    return None
+
+
+def _row_value(
+    row: pd.Series, columns: dict[str, Any], candidates: tuple[str, ...]
+) -> str | None:
+    column = _select_column(columns, candidates)
+    if column is None or pd.isna(row[column]):
+        return None
+    return str(row[column])
+
+
+def _normalize_column(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
+
+
+def _parse_number(value: Any) -> float | None:
+    match = re.search(_NUMBER_TOKEN, str(value))
+    if not match:
+        return None
+    return float(match.group(0).replace(",", ""))
+
+
+def _normalize_currency(value: str) -> str | None:
+    token = value.upper().replace(" ", "")
+    return {
+        "RM": "MYR",
+        "MYR": "MYR",
+        "USD": "USD",
+        "US$": "USD",
+        "$": "USD",
+        "EUR": "EUR",
+        "€": "EUR",
+        "SGD": "SGD",
+        "S$": "SGD",
+        "GBP": "GBP",
+        "£": "GBP",
+    }.get(token)
+
+
+def _currency_in_text(text: str) -> str | None:
+    match = re.search(_CURRENCY_TOKEN, text, re.IGNORECASE)
+    return _normalize_currency(match.group(0)) if match else None
+
+
+def _extract_invoice_id(text: str) -> str | None:
+    match = re.search(
+        r"(?:invoice\s*(?:id|no|number|#)|reference|ref)\s*[:#-]?\s*([A-Z0-9-]+)",
+        text,
+        re.IGNORECASE,
+    )
+    return match.group(1) if match else None
+
+
+def _extract_date(text: str) -> str | None:
+    match = re.search(
+        r"\b(?:20\d{2}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]20\d{2})\b",
+        text,
+    )
+    return match.group(0) if match else None
+
+
+def _failure(error: str) -> dict[str, Any]:
+    return {"success": False, "error": error}
