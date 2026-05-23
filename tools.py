@@ -23,6 +23,13 @@ _DATE_COLUMNS = ("invoice_date", "date", "payment_date")
 _SUPPORTED_SUFFIXES = {".csv", ".xlsx", ".pdf", ".txt", ".md"}
 _DEFAULT_LEDGER_PATH = Path(__file__).resolve().parent / "data" / "local_ledger.csv"
 _LEDGER_COLUMNS = ("transaction_id", "date", "reference", "amount_myr")
+_DEMO_MYR_RATES = {
+    "MYR": 1.0,
+    "USD": 4.25,
+    "SGD": 3.30,
+    "EUR": 4.80,
+    "GBP": 5.70,
+}
 
 _CURRENCY_TOKEN = r"(?:MYR|RM|USD|US\$|\$|EUR|€|SGD|S\$|GBP|£)"
 _NUMBER_TOKEN = r"[0-9][0-9,]*(?:\.[0-9]{1,2})?"
@@ -185,6 +192,47 @@ def search_local_ledger(
         "tolerance_percent": tolerance,
         "transaction": transaction,
         "reason": reason,
+    }
+
+
+def convert_currency(
+    amount: float, from_currency: str, to_currency: str = "MYR"
+) -> dict[str, Any]:
+    """Convert an invoice amount to MYR using stable synthetic demo rates.
+
+    This prototype intentionally uses declared mock rates so judging is
+    reproducible and does not depend on an external foreign-exchange API.
+    """
+    try:
+        source_amount = round(float(amount), 2)
+    except (TypeError, ValueError):
+        return _failure("Amount must be a numeric value.")
+
+    source_currency = _normalize_currency(str(from_currency))
+    target_currency = _normalize_currency(str(to_currency))
+
+    if source_amount < 0:
+        return _failure("Amount cannot be negative.")
+    if source_currency is None:
+        return _failure(f"Unsupported source currency: {from_currency}.")
+    if target_currency != "MYR":
+        return _failure("This prototype converts only into MYR.")
+    if source_currency not in _DEMO_MYR_RATES:
+        return _failure(f"No MYR demo rate configured for {source_currency}.")
+
+    rate = _DEMO_MYR_RATES[source_currency]
+    converted_amount = round(source_amount * rate, 2)
+
+    return {
+        "success": True,
+        "amount": source_amount,
+        "from_currency": source_currency,
+        "to_currency": "MYR",
+        "rate": rate,
+        "rate_source": "Synthetic demo rate for hackathon prototype",
+        "converted_amount": converted_amount,
+        "converted_rm_amount": converted_amount,
+        "calculation": f"{source_amount:.2f} {source_currency} x {rate:.2f} = RM {converted_amount:.2f}",
     }
 
 
