@@ -2,7 +2,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools import extract_invoice_data
+from tools import extract_invoice_data, search_local_ledger
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+LEDGER_PATH = PROJECT_ROOT / "data" / "local_ledger.csv"
 
 
 class ExtractInvoiceDataTests(unittest.TestCase):
@@ -56,6 +60,32 @@ class ExtractInvoiceDataTests(unittest.TestCase):
 
         self.assertFalse(result["success"])
         self.assertIn("not found", result["error"])
+
+
+class SearchLocalLedgerTests(unittest.TestCase):
+    def test_returns_exact_match_for_invoice_reference(self):
+        result = search_local_ledger(425.0, "INV-001", str(LEDGER_PATH))
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["status"], "Matched")
+        self.assertEqual(result["transaction"]["transaction_id"], "TXN001")
+        self.assertEqual(result["difference_myr"], 0.0)
+
+    def test_flags_small_difference_as_fee_variance(self):
+        result = search_local_ledger(425.0, "INV-002", str(LEDGER_PATH))
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["status"], "Matched with Fee Variance")
+        self.assertEqual(result["transaction"]["transaction_id"], "TXN002")
+        self.assertEqual(result["difference_myr"], 3.5)
+        self.assertLess(result["variance_percent"], 3.0)
+
+    def test_returns_unmatched_when_invoice_has_no_bank_reference(self):
+        result = search_local_ledger(300.0, "INV-003", str(LEDGER_PATH))
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["status"], "Unmatched")
+        self.assertIsNone(result["transaction"])
 
 
 if __name__ == "__main__":
