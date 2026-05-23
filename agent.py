@@ -7,6 +7,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from tools import extract_invoice_data, convert_currency, search_local_ledger
 import asyncio
+from tools import extract_invoice_data
 
 # 1. Load Shoots API Key securely
 load_dotenv()
@@ -30,15 +31,11 @@ llm = ChatOpenAI(
     temperature=0.1 # Keep it strictly deterministic for financial data
 )
 
-# 4. Define Tool Interfaces (To be built by your Data Engineer in tools.py)
+# 4. Define remaining Tool Interfaces (to be completed as integrations land)
 # The LLM reads these docstrings to understand what tools it has available.
-# def extract_invoice_data(file_path: str) -> dict:
-#     """Extracts the total amount and currency from a payment proof PDF/Image."""
-#     pass
-
-# def convert_currency(amount: float, from_currency: str, to_currency: str) -> float:
-#     """Converts a foreign currency amount to MYR (RM) using historical exchange rates."""
-#     pass
+def convert_currency(amount: float, from_currency: str, to_currency: str) -> float:
+    """Converts a foreign currency amount to MYR (RM) using historical exchange rates."""
+    pass
 
 # def search_local_ledger(converted_amount: float) -> dict:
 #     """Searches the local bank ledger CSV for a matching RM deposit."""
@@ -128,5 +125,5 @@ async def run_reconciliation_test(user_prompt: str):
 
 if __name__ == "__main__":
     # Test the agent's autonomous looping with a specific file path
-    test_prompt = "I have an invoice located at './data/invoice_001.csv'. Please extract, convert, and search the ./data/local_ledger.csv for a match."
+    test_prompt = "I have an invoice located at './data/invoice_001.csv'. Please extract, convert, and search the local ledger for a match."
     asyncio.run(run_reconciliation_test(test_prompt))
