@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools import extract_invoice_data, search_local_ledger
+from tools import convert_currency, extract_invoice_data, search_local_ledger
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -86,6 +86,34 @@ class SearchLocalLedgerTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(result["status"], "Unmatched")
         self.assertIsNone(result["transaction"])
+
+
+class ConvertCurrencyTests(unittest.TestCase):
+    def test_converts_usd_invoice_to_expected_myr_amount(self):
+        result = convert_currency(100.0, "USD")
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["converted_rm_amount"], 425.0)
+        self.assertEqual(result["rate"], 4.25)
+
+    def test_converts_sgd_invoice_for_second_demo_scenario(self):
+        result = convert_currency(50.0, "SGD")
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["converted_rm_amount"], 165.0)
+
+    def test_normalizes_rm_as_myr_without_changing_amount(self):
+        result = convert_currency(421.50, "RM")
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["from_currency"], "MYR")
+        self.assertEqual(result["converted_rm_amount"], 421.50)
+
+    def test_rejects_unconfigured_currency(self):
+        result = convert_currency(100.0, "JPY")
+
+        self.assertFalse(result["success"])
+        self.assertIn("Unsupported source currency", result["error"])
 
 
 if __name__ == "__main__":
