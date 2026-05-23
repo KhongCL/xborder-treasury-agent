@@ -21,6 +21,8 @@ _CURRENCY_COLUMNS = ("invoice_currency", "currency", "ccy")
 _ID_COLUMNS = ("invoice_id", "invoice_number", "reference", "ref")
 _DATE_COLUMNS = ("invoice_date", "date", "payment_date")
 _SUPPORTED_SUFFIXES = {".csv", ".xlsx", ".pdf", ".txt", ".md"}
+_DEFAULT_LEDGER_PATH = Path(__file__).resolve().parent / "data" / "local_ledger.csv"
+_LEDGER_COLUMNS = ("transaction_id", "date", "reference", "amount_myr")
 
 _CURRENCY_TOKEN = r"(?:MYR|RM|USD|US\$|\$|EUR|€|SGD|S\$|GBP|£)"
 _NUMBER_TOKEN = r"[0-9][0-9,]*(?:\.[0-9]{1,2})?"
@@ -66,6 +68,123 @@ def extract_invoice_data(file_path: str) -> dict[str, Any]:
         # These aliases align with the current AgentState field names.
         "invoice_amount": amount,
         "invoice_currency": currency,
+    }
+
+
+def search_local_ledger(
+    converted_amount: float,
+    invoice_id: str | None = None,
+    ledger_path: str | None = None,
+    tolerance_percent: float = 3.0,
+) -> dict[str, Any]:
+    """Find an RM bank deposit matching a converted invoice total.
+
+    Providing ``invoice_id`` keeps independent demo invoices from matching each
+    other's deposits. A difference within ``tolerance_percent`` is treated as a
+    likely cross-border transfer fee rather than a failed payment.
+    """
+    try:
+        expected_amount = round(float(converted_amount), 2)
+        tolerance = float(tolerance_percent)
+    except (TypeError, ValueError):
+        return _failure("Converted amount and tolerance must be numeric values.")
+
+    if expected_amount <= 0:
+        return _failure("Converted amount must be greater than zero.")
+    if tolerance < 0:
+        return _failure("Tolerance percent cannot be negative.")
+
+    path = Path(ledger_path) if ledger_path else _DEFAULT_LEDGER_PATH
+    if not path.exists():
+        return _failure(f"Bank ledger file not found: {path}")
+
+    try:
+        frame = pd.read_csv(path)
+    except (OSError, ValueError) as exc:
+        return _failure(f"Could not read bank ledger: {exc}")
+
+    columns = {_normalize_column(column): column for column in frame.columns}
+    missing = [column for column in _LEDGER_COLUMNS if column not in columns]
+    if missing:
+        return _failure(
+            "Bank ledger is missing required columns: " + ", ".join(missing)
+        )
+
+    transactions = frame.copy()
+    amount_column = columns["amount_myr"]
+    reference_column = columns["reference"]
+    transactions[amount_column] = pd.to_numeric(
+        transactions[amount_column], errors="coerce"
+    )
+    transactions = transactions.dropna(subset=[amount_column])
+
+    if invoice_id:
+        transactions = transactions[
+            transactions[reference_column]
+            .astype(str)
+            .str.contains(re.escape(invoice_id), case=False, na=False)
+        ]
+        if transactions.empty:
+            return _unmatched_result(
+                expected_amount,
+                tolerance,
+                invoice_id,
+                f"No bank transaction references invoice {invoice_id}.",
+            )
+
+    if transactions.empty:
+        return _unmatched_result(
+            expected_amount,
+            tolerance,
+            invoice_id,
+            "No valid transactions were available in the bank ledger.",
+        )
+
+    transactions["_difference_myr"] = (
+        transactions[amount_column] - expected_amount
+    ).abs()
+    transactions["_variance_percent"] = (
+        transactions["_difference_myr"] / expected_amount * 100
+    )
+    best = transactions.sort_values("_difference_myr").iloc[0]
+
+    difference = round(float(best["_difference_myr"]), 2)
+    variance = round(float(best["_variance_percent"]), 2)
+    actual_amount = round(float(best[amount_column]), 2)
+    transaction = {
+        "transaction_id": str(best[columns["transaction_id"]]),
+        "date": str(best[columns["date"]]),
+        "reference": str(best[reference_column]),
+        "amount_myr": actual_amount,
+    }
+
+    if difference <= 0.01:
+        status = "Matched"
+        reason = "Exact MYR amount match found in local bank ledger."
+    elif variance <= tolerance:
+        status = "Matched with Fee Variance"
+        direction = "below" if actual_amount < expected_amount else "above"
+        reason = (
+            f"Deposit is RM {difference:.2f} {direction} the expected amount "
+            f"({variance:.2f}% variance), within the {tolerance:.2f}% fee tolerance."
+        )
+    else:
+        status = "Unmatched"
+        reason = (
+            f"Closest deposit varies by RM {difference:.2f} ({variance:.2f}%), "
+            f"exceeding the {tolerance:.2f}% fee tolerance."
+        )
+
+    return {
+        "success": True,
+        "status": status,
+        "invoice_id": invoice_id,
+        "expected_amount_myr": expected_amount,
+        "difference_myr": difference,
+        "variance_percent": variance,
+        "tolerance_percent": tolerance,
+        "transaction": transaction,
+        "reason": reason,
     }
 
 
@@ -230,3 +349,22 @@ def _extract_date(text: str) -> str | None:
 
 def _failure(error: str) -> dict[str, Any]:
     return {"success": False, "error": error}
+
+
+def _unmatched_result(
+    expected_amount: float,
+    tolerance: float,
+    invoice_id: str | None,
+    reason: str,
+) -> dict[str, Any]:
+    return {
+        "success": True,
+        "status": "Unmatched",
+        "invoice_id": invoice_id,
+        "expected_amount_myr": expected_amount,
+        "difference_myr": None,
+        "variance_percent": None,
+        "tolerance_percent": tolerance,
+        "transaction": None,
+        "reason": reason,
+    }
