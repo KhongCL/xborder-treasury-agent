@@ -55,10 +55,10 @@ def run_agent(state: AgentState):
     
     # Inject the persona and the hackathon-winning discrepancy logic
     system_prompt = SystemMessage(content="""
-    You are a Global Treasury Reconciliation Agent. Your job is to match foreign invoices to local RM bank statements.
-    CRITICAL RULE: If the converted RM amount matches a bank ledger entry within a 3% variance, 
-    do not fail the match. Mark it as 'Matched with Fee Variance' and log the exact fee percentage.
-    """)
+        You are a Global Treasury Reconciliation Agent. Your job is to match foreign invoices to local RM bank statements.
+        CRITICAL RULE: Always respect the tolerance threshold provided by the user. If the variance is within that threshold, 
+        do not fail the match. Mark it as 'Matched with Fee Variance' and log the exact fee percentage.
+        """)
     
     # Ensure the system prompt is always guiding the agent
     if not messages or not isinstance(messages[0], SystemMessage):
