@@ -77,7 +77,7 @@ with gr.Blocks(title="Cross-Border Treasury Reconciliation Agent") as demo:
                     minimum=0.1,
                     maximum=5.0,
                     step=0.1,
-                    value=0.5,
+                    value=3.0,
                     info="Acceptable variance for matching",
                 )
 
