@@ -10,15 +10,63 @@ import json
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
-# Removed convert_currency and search_local_ledger imports here, 
-# because the Agent will now handle them autonomously!
+# Removed convert_currency and search_local_ledger imports here,
+# because the Agent will now handle them autonomously through agent.py.
 from tools import _DEMO_MYR_RATES
 import traceback
-
-from agent import app  # Import your compiled LangGraph from agent.py
 from langchain_core.messages import HumanMessage
+import importlib
+import sys
+import os
 
 LOGS = []
+
+
+def set_api_key(new_key: str) -> str:
+    """Save a new API key to .env, set it in the current process env, and reload agent module.
+
+    Returns a status message suitable for showing in the UI log.
+    """
+    try:
+        if not new_key or not isinstance(new_key, str) or new_key.strip() == "":
+            return "ERROR: API key is empty."
+        env_path = os.path.join(os.path.dirname(__file__), ".env")
+        # Read existing .env lines (if any)
+        existing = []
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                existing = f.readlines()
+
+        key_line = f"SHOOTS_API_KEY={new_key.strip()}\n"
+        found = False
+        for i, line in enumerate(existing):
+            if line.startswith("SHOOTS_API_KEY="):
+                existing[i] = key_line
+                found = True
+                break
+
+        if not found:
+            existing.append(key_line)
+
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(existing)
+
+        # Set environment variables for current process
+        os.environ["SHOOTS_API_KEY"] = new_key.strip()
+        os.environ["OPENAI_API_KEY"] = new_key.strip()
+
+        # Try to reload agent module so next reconciliation picks up the new key
+        try:
+            if "agent" in sys.modules:
+                importlib.reload(sys.modules["agent"])
+            else:
+                importlib.import_module("agent")
+        except Exception as exc:
+            return f"WARNING: API saved to .env, env updated, but reloading agent failed: {exc}"
+
+        return "API key updated and agent reloaded successfully."
+    except Exception as exc:
+        return f"ERROR updating API key: {exc}"
 
 def log_message(message: str) -> str:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -203,71 +251,82 @@ async def process_reconciliation(
 
     results = [] # We will store the final agent conclusions here
 
+    try:
+        # If agent is already loaded, reload it so any updated env vars are picked up.
+        if "agent" in sys.modules:
+            agent_module = importlib.reload(sys.modules["agent"])
+        else:
+            agent_module = importlib.import_module("agent")
+        app = getattr(agent_module, "app")
+    except Exception as exc:
+        log_text = log_message(f"ERROR: Failed to initialize agent - {exc}")
+        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
+        return
+
     # STREAM THE AGENT THOUGHTS LIVE
-    async for event in app.astream(initial_state):
-        for node_name, state_update in event.items():
-            messages = state_update.get("messages", [])
-            for msg in messages:
-                if hasattr(msg, "tool_calls") and msg.tool_calls:
-                    # The agent decided to use a tool
-                    tool_name = msg.tool_calls[0]['name']
-                    log_text = log_message(f"⚙️ Agent executing tool: {tool_name}...")
-                    yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
-                
-                elif hasattr(msg, "content") and msg.content:
-                    # --- GEMINI FORMATTING FIX ---
-                    content_val = msg.content
+    try:
+        async for event in app.astream(initial_state):
+            for node_name, state_update in event.items():
+                messages = state_update.get("messages", [])
+                for msg in messages:
+                    if hasattr(msg, "tool_calls") and msg.tool_calls:
+                        # The agent decided to use a tool
+                        tool_name = msg.tool_calls[0]['name']
+                        log_text = log_message(f"⚙️ Agent executing tool: {tool_name}...")
+                        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
                     
-                    # If Gemini returned a list (or stringified list), extract just the text
-                    if isinstance(content_val, list):
-                        content_val = "\n".join([item.get("text", "") for item in content_val if "text" in item])
-                    elif isinstance(content_val, str) and content_val.startswith("[{'type': 'text'"):
-                        import ast
-                        try:
-                            parsed = ast.literal_eval(content_val)
-                            content_val = "\n".join([item.get("text", "") for item in parsed if "text" in item])
-                        except:
-                            pass
-                    # -----------------------------
+                    elif hasattr(msg, "content") and msg.content:
+                        # Check if this is the final summary (it usually won't have <think> tags if it's the end)
+                        if "<think>" in msg.content:
+                            clean_thought = msg.content.split("</think>")[0].replace("<think>", "").strip()
+                            log_text = log_message(f"🧠 Agent Reasoning: {clean_thought[:100]}...") # truncate for UI
+                        else:
+                            log_text = log_message(f"✅ Agent Final Conclusion: \n{msg.content}")
+                        
+                        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
 
-                    if "<think>" in content_val:
-                        clean_thought = content_val.split("</think>")[0].replace("<think>", "").strip()
-                        log_text = log_message(f"🧠 Agent Reasoning: {clean_thought[:100]}...")
-                    else:
-                        log_text = log_message(f"✅ Agent Final Conclusion: \n{content_val}")
-                    
-                    yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
-
-                    # If this is the final output, let's parse the last known state to populate the UI table
-                    # (In a real production app, we would extract structured JSON, but we will mock the table row for the hackathon UI based on the tool outputs)
-                    
-            # Update the State tracking variables based on tool outputs
-            if node_name == "tools":
-                 for msg in messages:
-                     if hasattr(msg, "content"):
-                         try:
-                             # The tools return JSON strings, so we can parse them to build the UI Table!
-                             tool_data = json.loads(msg.content)
-                             if "invoice_amount" in tool_data:
-                                 initial_state["invoice_amount"] = tool_data["invoice_amount"]
-                                 initial_state["invoice_currency"] = tool_data.get("currency", "USD")
-                             if "converted_rm_amount" in tool_data:
-                                 initial_state["converted_rm_amount"] = tool_data["converted_rm_amount"]
-                             if "status" in tool_data:
-                                 initial_state["reconciliation_status"] = tool_data["status"]
-                                 
-                                 # We reached the final tool, build the row!
-                                 results.append({
-                                     "invoice_id": tool_data.get("invoice_id", "UNKNOWN"),
-                                     "invoice_amount": initial_state["invoice_amount"],
-                                     "invoice_currency": initial_state["invoice_currency"],
-                                     "converted_rm_amount": initial_state["converted_rm_amount"],
-                                     "status": tool_data["status"],
-                                     "reason": tool_data.get("reason", ""),
-                                     "variance_percent": tool_data.get("variance_percent", 0.0)
-                                 })
-                         except:
-                             pass
+                        # If this is the final output, let's parse the last known state to populate the UI table
+                        # (In a real production app, we would extract structured JSON, but we will mock the table row for the hackathon UI based on the tool outputs)
+                        
+                # Update the State tracking variables based on tool outputs
+                if node_name == "tools":
+                     for msg in messages:
+                         if hasattr(msg, "content"):
+                             try:
+                                 # The tools return JSON strings, so we can parse them to build the UI Table!
+                                 tool_data = json.loads(msg.content)
+                                 if "invoice_amount" in tool_data:
+                                     initial_state["invoice_amount"] = tool_data["invoice_amount"]
+                                     initial_state["invoice_currency"] = tool_data.get("currency", "USD")
+                                 if "converted_rm_amount" in tool_data:
+                                     initial_state["converted_rm_amount"] = tool_data["converted_rm_amount"]
+                                 if "status" in tool_data:
+                                     initial_state["reconciliation_status"] = tool_data["status"]
+                                     
+                                     # We reached the final tool, build the row!
+                                     results.append({
+                                         "invoice_id": tool_data.get("invoice_id", "UNKNOWN"),
+                                         "invoice_amount": initial_state["invoice_amount"],
+                                         "invoice_currency": initial_state["invoice_currency"],
+                                         "converted_rm_amount": initial_state["converted_rm_amount"],
+                                         "status": tool_data["status"],
+                                         "reason": tool_data.get("reason", ""),
+                                         "variance_percent": tool_data.get("variance_percent", 0.0)
+                                     })
+                             except:
+                                 pass
+    except Exception as exc:
+        error_message = str(exc)
+        if "usage cap exceeded" in error_message.lower() or "402" in error_message:
+            user_message = (
+                "ERROR: AI subscription usage cap exceeded. "
+                "Please add balance to the Shoots/OpenAI account or use a valid paid API key."
+            )
+        else:
+            user_message = f"ERROR: AI agent failed - {error_message}"
+        log_text = log_message(user_message)
+        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
+        return
 
     # Final UI Table Update
     results_df = pd.DataFrame(results)
