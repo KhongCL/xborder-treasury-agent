@@ -2,13 +2,6 @@ import gradio as gr
 
 THEME_TOGGLE_JS = """
 () => {
-  const storageKey = "xborder-theme";
-  const params = new URLSearchParams(window.location.search);
-  const queryTheme = params.get("__theme");
-  const savedTheme = localStorage.getItem(storageKey);
-  const preferredTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  const currentTheme = queryTheme || savedTheme || preferredTheme;
-
   const syncToggle = (theme) => {
     const toggle = document.getElementById("theme-toggle");
     if (!toggle) return;
@@ -17,30 +10,9 @@ THEME_TOGGLE_JS = """
     toggle.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
   };
 
-  const navigateToTheme = (theme) => {
-    const nextParams = new URLSearchParams(window.location.search);
-    nextParams.set("__theme", theme);
-    localStorage.setItem(storageKey, theme);
-    const nextUrl = `${window.location.pathname}?${nextParams.toString()}${window.location.hash}`;
-    window.location.assign(nextUrl);
-  };
-
+  const params = new URLSearchParams(window.location.search);
+  const currentTheme = params.get("__theme") === "dark" ? "dark" : "light";
   syncToggle(currentTheme);
-
-  if (!queryTheme) {
-    navigateToTheme(currentTheme);
-    return;
-  }
-
-  if (!window.__xborderThemeHandlerBound) {
-    window.__xborderThemeHandlerBound = true;
-    document.addEventListener("click", (event) => {
-      const toggle = event.target.closest("#theme-toggle");
-      if (!toggle) return;
-      const nextTheme = (toggle.getAttribute("data-theme") || currentTheme) === "dark" ? "light" : "dark";
-      navigateToTheme(nextTheme);
-    });
-  }
 }
 """
 
@@ -358,7 +330,14 @@ def build_header():
               <p class="app-header__subtitle">Upload invoices, run reconciliation, and export results from one workspace.</p>
             </div>
           </div>
-          <button id="theme-toggle" class="app-header__toggle" type="button" aria-label="Toggle theme" data-theme="light">☾</button>
+          <button
+            id="theme-toggle"
+            class="app-header__toggle"
+            type="button"
+            aria-label="Toggle theme"
+            data-theme="light"
+            onclick="(function(){const params=new URLSearchParams(window.location.search);const current=params.get('__theme')==='dark'?'dark':'light';const next=current==='dark'?'light':'dark';console.log('[theme-toggle] switching from '+current+' to '+next);window.location.assign('/?__theme='+next);})()"
+          >☾</button>
         </header>
         """
     )
