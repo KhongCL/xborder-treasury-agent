@@ -5,3 +5,4 @@ gradio
 pandas
 openpyxl
 pypdf
+reportlab
