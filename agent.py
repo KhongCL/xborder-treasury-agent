@@ -10,7 +10,7 @@ import asyncio
 
 # 1. Load Shoots API Key securely
 load_dotenv()
-SHOOTS_API_KEY = os.getenv("SHOOTS_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # 2. Define the Agent's Memory State
 # This dictionary gets passed between nodes. It is how your UI will read the final output.
@@ -24,10 +24,10 @@ class AgentState(TypedDict):
 # 3. Initialize the Shoots AI Brain
 # We use the OpenAI wrapper but hijack the base URL to point to the decentralized Shoots network
 llm = ChatOpenAI(
-    model="google/gemma-4-31B-turbo-TEE", # A strong reasoning model available on Shoots
-    openai_api_key=SHOOTS_API_KEY,
-    openai_api_base="https://llm.chutes.ai/v1",
-    temperature=0.1 # Keep it strictly deterministic for financial data
+    model="gemini-3.5-flash", # Powerful reasoning and excellent at tool-calling
+    openai_api_key=GEMINI_API_KEY,
+    openai_api_base="https://generativelanguage.googleapis.com/v1beta/openai/",
+    temperature=0.1 
 )
 
 # 4. Define Tool Interfaces (To be built by your Data Engineer in tools.py)
