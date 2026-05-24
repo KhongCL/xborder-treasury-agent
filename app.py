@@ -37,9 +37,10 @@ with gr.Blocks(title="Cross-Border Treasury Reconciliation Agent") as demo:
                     file_types=[".csv", ".xls", ".xlsx"],
                     type="filepath",
                 )
+                
+            with gr.Accordion("Expected CSV Columns (Click to expand)", open=False):
                 gr.Markdown(
                     """
-                    **Expected CSV Columns:**
                     - `invoice_amount`: Original invoice amount
                     - `invoice_currency`: Invoice currency code
                     - `received_amount`: Amount received in account
