@@ -228,10 +228,4 @@ with gr.Blocks(title="Cross-Border Treasury Reconciliation Agent") as demo:
 
 
 if __name__ == "__main__":
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=7860,
-        share=False,
-        debug=True,
-        theme=gr.themes.Soft(),
-    )
+    demo.launch()
