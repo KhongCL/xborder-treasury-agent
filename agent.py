@@ -2,7 +2,7 @@ import os
 from typing import TypedDict, Annotated, Sequence
 from dotenv import load_dotenv
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from tools import extract_invoice_data, convert_currency, search_local_ledger
@@ -10,7 +10,7 @@ import asyncio
 
 # 1. Load Shoots API Key securely
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+MORPHEUS_API_KEY = os.getenv("MORPHEUS_API_KEY")
 
 # 2. Define the Agent's Memory State
 # This dictionary gets passed between nodes. It is how your UI will read the final output.
@@ -23,9 +23,10 @@ class AgentState(TypedDict):
 
 # 3. Initialize the Shoots AI Brain
 # We use the OpenAI wrapper but hijack the base URL to point to the decentralized Shoots network
-llm = ChatGoogleGenerativeAI(
-    model="gemini-3.5-flash", # Native integration, flawless tool calling
-    google_api_key=GEMINI_API_KEY,
+llm = ChatOpenAI(
+    model="glm-4.7-flash",
+    openai_api_key=MORPHEUS_API_KEY,
+    openai_api_base="https://api.mor.org/api/v1",
     temperature=0.1 
 )
 
