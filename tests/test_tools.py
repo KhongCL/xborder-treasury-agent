@@ -7,6 +7,7 @@ from tools import convert_currency, extract_invoice_data, search_local_ledger
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LEDGER_PATH = PROJECT_ROOT / "data" / "local_ledger.csv"
+DEMO_INVOICE_DIR = PROJECT_ROOT / "data" / "demo_invoices"
 
 
 class ExtractInvoiceDataTests(unittest.TestCase):
@@ -61,6 +62,36 @@ class ExtractInvoiceDataTests(unittest.TestCase):
         self.assertFalse(result["success"])
         self.assertIn("not found", result["error"])
 
+    def test_extracts_perfect_match_demo_pdf(self):
+        result = extract_invoice_data(
+            str(DEMO_INVOICE_DIR / "invoice_perfect_match_INV-001.pdf")
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["invoice_id"], "INV-001")
+        self.assertEqual(result["invoice_currency"], "USD")
+        self.assertEqual(result["invoice_amount"], 100.0)
+
+    def test_extracts_close_match_demo_pdf(self):
+        result = extract_invoice_data(
+            str(DEMO_INVOICE_DIR / "invoice_close_match_INV-002.pdf")
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["invoice_id"], "INV-002")
+        self.assertEqual(result["invoice_currency"], "USD")
+        self.assertEqual(result["invoice_amount"], 100.0)
+
+    def test_extracts_no_match_demo_pdf(self):
+        result = extract_invoice_data(
+            str(DEMO_INVOICE_DIR / "invoice_no_match_INV-003.pdf")
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["invoice_id"], "INV-003")
+        self.assertEqual(result["invoice_currency"], "EUR")
+        self.assertEqual(result["invoice_amount"], 200.0)
+
 
 class SearchLocalLedgerTests(unittest.TestCase):
     def test_returns_exact_match_for_invoice_reference(self):
@@ -77,7 +108,8 @@ class SearchLocalLedgerTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(result["status"], "Matched with Fee Variance")
         self.assertEqual(result["transaction"]["transaction_id"], "TXN002")
-        self.assertEqual(result["difference_myr"], 3.5)
+        self.assertEqual(result["difference_myr"], 8.5)
+        self.assertEqual(result["variance_percent"], 2.0)
         self.assertLess(result["variance_percent"], 3.0)
 
     def test_returns_unmatched_when_invoice_has_no_bank_reference(self):
