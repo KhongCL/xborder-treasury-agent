@@ -1,0 +1,2 @@
+invoice_id,invoice_date,currency,amount,customer,description
+INV-002,2026-05-24,USD,100.00,Global Tech Solutions,Software licensing fee

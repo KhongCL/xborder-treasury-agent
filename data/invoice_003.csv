@@ -1,0 +1,2 @@
+invoice_id,invoice_date,currency,amount,customer,description
+INV-003,2026-05-22,EUR,200.00,Berlin Data Corp,Cloud hosting services
