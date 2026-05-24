@@ -14,8 +14,6 @@ from PIL import Image, ImageDraw, ImageFont
 # because the Agent will now handle them autonomously!
 from tools import _DEMO_MYR_RATES
 import traceback
-
-from agent import app  # Import your compiled LangGraph from agent.py
 from langchain_core.messages import HumanMessage
 
 LOGS = []
@@ -202,6 +200,13 @@ async def process_reconciliation(
     }
 
     results = [] # We will store the final agent conclusions here
+
+    try:
+        from agent import app
+    except Exception as exc:
+        log_text = log_message(f"ERROR: Failed to initialize agent - {exc}")
+        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
+        return
 
     # STREAM THE AGENT THOUGHTS LIVE
     async for event in app.astream(initial_state):

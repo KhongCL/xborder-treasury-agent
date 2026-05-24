@@ -32,9 +32,9 @@ with gr.Blocks(title="Cross-Border Treasury Reconciliation Agent") as demo:
             with gr.Group():
                 gr.Markdown("#### Transaction Data")
                 file_input = gr.File(
-                    label="Upload CSV/Excel File",
+                    label="Upload CSV/Excel/PDF File",
                     file_count="single",
-                    file_types=[".csv", ".xls", ".xlsx"],
+                    file_types=[".csv", ".xls", ".xlsx", ".pdf"],
                     type="filepath",
                 )
                 
