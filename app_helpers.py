@@ -8,6 +8,7 @@ import asyncio
 import json
 
 import pandas as pd
+import gradio as gr
 from PIL import Image, ImageDraw, ImageFont
 
 # Removed convert_currency and search_local_ledger imports here,
@@ -181,27 +182,29 @@ def save_dataframe_pdf(df: pd.DataFrame, filename: str) -> str:
     create_dataframe_image(df).convert("RGB").save(output_path, format="PDF")
     return output_path
 
-def generate_pdf(results_df: pd.DataFrame) -> tuple[str | None, str]:
+def generate_pdf(results_df: pd.DataFrame):
     if results_df is None or len(results_df) == 0:
-        return None, "ERROR: No reconciliation results available to export."
+        return gr.update(value=None, visible=False), "ERROR: No reconciliation results available to export."
     try:
         filename = f"reconciliation_{int(datetime.now().timestamp())}.pdf"
         output_path = save_dataframe_pdf(results_df, filename)
-        if not os.path.exists(output_path): return None, "ERROR: PDF generation failed."
-        return output_path, "PDF generated successfully."
+        if not os.path.exists(output_path):
+            return gr.update(value=None, visible=False), "ERROR: PDF generation failed."
+        return gr.update(value=output_path, visible=True), "PDF generated successfully."
     except Exception as exc:
-        return None, f"ERROR: PDF export failed - {exc}"
+        return gr.update(value=None, visible=False), f"ERROR: PDF export failed - {exc}"
 
-def generate_image(results_df: pd.DataFrame) -> tuple[str | None, str]:
+def generate_image(results_df: pd.DataFrame):
     if results_df is None or len(results_df) == 0:
-        return None, "ERROR: No reconciliation results available to export."
+        return gr.update(value=None, visible=False), "ERROR: No reconciliation results available to export."
     try:
         filename = f"reconciliation_{int(datetime.now().timestamp())}.png"
         output_path = save_dataframe_image(results_df, filename)
-        if not os.path.exists(output_path): return None, "ERROR: Image generation failed."
-        return output_path, "Image generated successfully."
+        if not os.path.exists(output_path):
+            return gr.update(value=None, visible=False), "ERROR: Image generation failed."
+        return gr.update(value=output_path, visible=True), "Image generated successfully."
     except Exception as exc:
-        return None, f"ERROR: Image export failed - {exc}"
+        return gr.update(value=None, visible=False), f"ERROR: Image export failed - {exc}"
 
 # --- THE NEW ASYNC AGENT INTEGRATION ---
 
@@ -218,11 +221,12 @@ async def process_reconciliation(
     It yields UI updates (dataframes and logs) in real-time as the agent thinks.
     """
     log_text = log_message(f"Starting Agentic Reconciliation...")
-    yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
+    hidden_file = gr.update(value=None, visible=False)
+    yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", hidden_file, hidden_file
 
     if not file_upload:
         log_text = log_message("ERROR: No file uploaded")
-        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
+        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", hidden_file, hidden_file
         return
 
     # Extract file path
@@ -232,7 +236,7 @@ async def process_reconciliation(
         filepath = getattr(file_upload, "name", None) or getattr(file_upload, "filename", None) or str(file_upload)
 
     log_text = log_message(f"Uploading file: {os.path.basename(filepath)} to Agent Context.")
-    yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
+    yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", hidden_file, hidden_file
 
     # Construct the prompt instructing the LangGraph agent
     prompt = (
@@ -260,7 +264,7 @@ async def process_reconciliation(
         app = getattr(agent_module, "app")
     except Exception as exc:
         log_text = log_message(f"ERROR: Failed to initialize agent - {exc}")
-        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
+        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", hidden_file, hidden_file
         return
 
     # STREAM THE AGENT THOUGHTS LIVE
@@ -273,7 +277,7 @@ async def process_reconciliation(
                         # The agent decided to use a tool
                         tool_name = msg.tool_calls[0]['name']
                         log_text = log_message(f"⚙️ Agent executing tool: {tool_name}...")
-                        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
+                        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", hidden_file, hidden_file
                     
                     elif hasattr(msg, "content") and msg.content:
                         # Check if this is the final summary (it usually won't have <think> tags if it's the end)
@@ -283,7 +287,7 @@ async def process_reconciliation(
                         else:
                             log_text = log_message(f"✅ Agent Final Conclusion: \n{msg.content}")
                         
-                        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
+                        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", hidden_file, hidden_file
 
                         # If this is the final output, let's parse the last known state to populate the UI table
                         # (In a real production app, we would extract structured JSON, but we will mock the table row for the hackathon UI based on the tool outputs)
@@ -325,7 +329,7 @@ async def process_reconciliation(
         else:
             user_message = f"ERROR: AI agent failed - {error_message}"
         log_text = log_message(user_message)
-        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
+        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", hidden_file, hidden_file
         return
 
     # Final UI Table Update
@@ -334,7 +338,7 @@ async def process_reconciliation(
     page_label = build_page_label(current_page, total_pages)
     
     log_text = log_message("Reconciliation workflow completed.")
-    yield page_df, log_text, results_df, current_page, page_label, None, None
+    yield page_df, log_text, results_df, current_page, page_label, hidden_file, hidden_file
 
 
 def clear_logs():
@@ -346,7 +350,8 @@ def clear_file(): return None
 
 def clear_all():
     clear_logs()
-    return None, pd.DataFrame(), "", pd.DataFrame(), 1, "Page 0 of 0", None, None
+    hidden_file = gr.update(value=None, visible=False)
+    return None, pd.DataFrame(), "", pd.DataFrame(), 1, "Page 0 of 0", hidden_file, hidden_file
 
 def paginate_dataframe(df: pd.DataFrame, page: int, page_size: int = 25) -> tuple[pd.DataFrame, int, int]:
     if df is None or len(df) == 0: return pd.DataFrame(), 0, 0

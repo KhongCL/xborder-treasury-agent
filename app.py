@@ -15,14 +15,16 @@ from app_helpers import (
     process_reconciliation,
     set_api_key,
 )
-from ui_components import CSS, build_header, build_configuration_panel, build_results_panel
+from ui_components import CSS, THEME_TOGGLE_JS, build_header, build_configuration_panel, build_results_panel
 
-with gr.Blocks(title="Cross-Border Treasury Reconciliation Agent") as demo:
-    # Single top-level row: header, configuration, results
-    with gr.Row(elem_id="app-container"):
-        with gr.Column(scale=2):
-            build_header()
+with gr.Blocks(
+    title="Cross-Border Treasury Reconciliation Agent",
+    fill_width=True,
+    elem_classes="app-shell",
+) as demo:
+    build_header()
 
+    with gr.Row(elem_id="app-container", equal_height=False):
         (
             file_input,
             edit_api_key_btn,
@@ -35,7 +37,6 @@ with gr.Blocks(title="Cross-Border Treasury Reconciliation Agent") as demo:
             exchange_rate,
             tolerance_threshold,
             auto_match,
-            logging_level,
             process_btn,
             clear_btn,
         ) = build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate)
@@ -160,4 +161,5 @@ if __name__ == "__main__":
     demo.launch(
         theme=gr.themes.Soft(primary_hue="blue"),
         css=CSS,
+        js=THEME_TOGGLE_JS,
     )
