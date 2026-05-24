@@ -215,12 +215,26 @@ async def process_reconciliation(
                     yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
                 
                 elif hasattr(msg, "content") and msg.content:
-                    # Check if this is the final summary (it usually won't have <think> tags if it's the end)
-                    if "<think>" in msg.content:
-                        clean_thought = msg.content.split("</think>")[0].replace("<think>", "").strip()
-                        log_text = log_message(f"🧠 Agent Reasoning: {clean_thought[:100]}...") # truncate for UI
+                    # --- GEMINI FORMATTING FIX ---
+                    content_val = msg.content
+                    
+                    # If Gemini returned a list (or stringified list), extract just the text
+                    if isinstance(content_val, list):
+                        content_val = "\n".join([item.get("text", "") for item in content_val if "text" in item])
+                    elif isinstance(content_val, str) and content_val.startswith("[{'type': 'text'"):
+                        import ast
+                        try:
+                            parsed = ast.literal_eval(content_val)
+                            content_val = "\n".join([item.get("text", "") for item in parsed if "text" in item])
+                        except:
+                            pass
+                    # -----------------------------
+
+                    if "<think>" in content_val:
+                        clean_thought = content_val.split("</think>")[0].replace("<think>", "").strip()
+                        log_text = log_message(f"🧠 Agent Reasoning: {clean_thought[:100]}...")
                     else:
-                        log_text = log_message(f"✅ Agent Final Conclusion: \n{msg.content}")
+                        log_text = log_message(f"✅ Agent Final Conclusion: \n{content_val}")
                     
                     yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", None, None
 
