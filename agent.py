@@ -23,10 +23,9 @@ class AgentState(TypedDict):
 
 # 3. Initialize the Shoots AI Brain
 # We use the OpenAI wrapper but hijack the base URL to point to the decentralized Shoots network
-llm = ChatOpenAI(
-    model="gemini-3.5-flash", # Powerful reasoning and excellent at tool-calling
-    openai_api_key=GEMINI_API_KEY,
-    openai_api_base="https://generativelanguage.googleapis.com/v1beta/openai/",
+llm = ChatGoogleGenerativeAI(
+    model="gemini-3.5-flash", # Native integration, flawless tool calling
+    google_api_key=GEMINI_API_KEY,
     temperature=0.1 
 )
 
