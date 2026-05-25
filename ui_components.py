@@ -143,7 +143,7 @@ body {
   min-height: 120px;
 }
 .section-panel {
-  padding: 10px 18px 18px;
+  padding: 5px 5px 5px;
 }
 .section-panel > .gr-markdown {
   margin: 0 0 10px 0 !important;
@@ -158,9 +158,23 @@ body {
 }
 .section-panel > .gr-markdown h3 {
   font-size: 1.05rem;
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  padding: 6px 12px;
+  border-radius: 12px;
+  display: inline-block;
 }
 .section-panel > .gr-markdown h4 {
   font-size: 0.95rem;
+}
+.section-panel .section-title h3 {
+  font-size: 1.3rem;
+}
+.section-panel .section-title {
+  margin-bottom: 2px;
+}
+.config-panel {
+  background: var(--block-background-fill, #ffffff) !important;
 }
 .column-panel {
   display: flex;
@@ -328,6 +342,15 @@ body {
 [data-theme="dark"] .gr-file {
   border-color: rgba(96, 165, 250, 0.45);
 }
+.dark .config-panel,
+[data-theme="dark"] .config-panel {
+  background: #0b1220 !important;
+}
+.dark .section-panel > .gr-markdown h3,
+[data-theme="dark"] .section-panel > .gr-markdown h3 {
+  background: #030712 !important;
+  color: #f8fafc !important;
+}
 .dark .gr-dataframe table,
 .dark .gr-dataframe .table-wrap,
 .dark .gr-dataframe .wrap,
@@ -405,8 +428,8 @@ def build_header():
 
 def build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate):
   with gr.Column(scale=1, elem_classes="left-panel"):
-    with gr.Group(elem_classes="section-panel"):
-      gr.Markdown("### Configuration")
+    with gr.Group(elem_classes="section-panel config-panel"):
+      gr.Markdown("### Configuration", elem_classes="section-title")
 
       with gr.Group():
         gr.Markdown("#### Transaction Data")
@@ -483,7 +506,7 @@ def build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate):
 def build_results_panel():
     with gr.Column(scale=1, elem_classes="right-panel"):
         with gr.Group(elem_classes="section-panel"):
-            gr.Markdown("### Results")
+            gr.Markdown("### Results", elem_classes="section-title")
 
             results_output = gr.Dataframe(
                 label="Results Table",
@@ -506,7 +529,7 @@ def build_results_panel():
               img_btn = gr.DownloadButton("🖼️ Export Image", variant="primary")
 
         with gr.Group(elem_classes="section-panel"):
-            gr.Markdown("### Agent Log")
+            gr.Markdown("### Agent Log", elem_classes="section-title")
             log_output = gr.Textbox(
                 label="Output Log",
                 lines=16,
