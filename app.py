@@ -13,7 +13,6 @@ from app_helpers import (
     get_exchange_rate,
     paginate_dataframe,
     process_reconciliation,
-    set_api_key,
 )
 from ui_components import CSS, THEME_TOGGLE_JS, build_header, build_configuration_panel, build_results_panel
 
@@ -27,16 +26,10 @@ with gr.Blocks(
     with gr.Row(elem_id="app-container", equal_height=False):
         (
             file_input,
-            edit_api_key_btn,
-            api_modal,
-            api_key_input,
-            api_key_save,
-            api_key_close,
             source_currency,
             target_currency,
             exchange_rate,
             tolerance_threshold,
-            auto_match,
             process_btn,
             clear_btn,
         ) = build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate)
@@ -79,7 +72,7 @@ with gr.Blocks(
             target_currency,
             exchange_rate,
             tolerance_threshold,
-            auto_match,
+            results_store, # <-- This allows us to keep previous records!
         ],
         outputs=[
             results_output,
@@ -142,19 +135,6 @@ with gr.Blocks(
         return log_message("System initialized. Ready for reconciliation.")
 
     demo.load(fn=init_logs, outputs=[log_output])
-
-    # Wire the API key popup toggles and save/close actions
-    # Show modal when clicking Edit button
-    edit_api_key_btn.click(fn=lambda: gr.update(visible=True), inputs=None, outputs=[api_modal])
-    # Close modal
-    api_key_close.click(fn=lambda: gr.update(visible=False), inputs=None, outputs=[api_modal])
-
-    # Save API key and hide modal (wrapper to also return a visibility update)
-    def save_key_and_close(new_key: str):
-        msg = set_api_key(new_key)
-        return msg, gr.update(visible=False)
-
-    api_key_save.click(fn=save_key_and_close, inputs=[api_key_input], outputs=[log_output, api_modal])
 
 
 if __name__ == "__main__":

@@ -358,23 +358,6 @@ def build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate):
           show_label=False,
         )
 
-      # Admin: API key editing is in a hidden popup-like panel toggled by a button
-      with gr.Row():
-        edit_api_key_btn = gr.Button("Edit API Key", variant="secondary")
-
-      with gr.Column(visible=False, elem_id="api-modal") as api_modal:
-        with gr.Group(elem_classes="section-panel"):
-          gr.Markdown("### API Key (private)")
-          api_key_input = gr.Textbox(
-            label="API Key (private)",
-            placeholder="Paste SHOOTS/OpenAI API key here",
-            type="password",
-            interactive=True,
-          )
-          with gr.Row():
-            api_key_save = gr.Button("Save API Key", variant="primary")
-            api_key_close = gr.Button("Close", variant="secondary")
-
       with gr.Accordion("Expected CSV Columns", open=False):
         gr.Markdown(
           """
@@ -420,28 +403,15 @@ def build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate):
       )
 
       with gr.Row():
-        auto_match = gr.Checkbox(
-          label="Enable Auto-Matching",
-          value=True,
-          info="Automatically match transactions within tolerance",
-        )
-
-      with gr.Row():
         process_btn = gr.Button("🚀 Process Reconciliation", variant="primary", elem_classes="process-button")
         clear_btn = gr.Button("🗑️ Clear All", variant="secondary")
 
   return (
     file_input,
-    edit_api_key_btn,
-    api_modal,
-    api_key_input,
-    api_key_save,
-    api_key_close,
     source_currency,
     target_currency,
     exchange_rate,
     tolerance_threshold,
-    auto_match,
     process_btn,
     clear_btn,
   )
