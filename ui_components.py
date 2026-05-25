@@ -9,7 +9,6 @@ THEME_TOGGLE_JS = """
     toggle.setAttribute("data-theme", theme);
     toggle.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
   };
-
   const params = new URLSearchParams(window.location.search);
   const currentTheme = params.get("__theme") === "dark" ? "dark" : "light";
   syncToggle(currentTheme);
@@ -246,11 +245,20 @@ body {
   background: var(--input-background-fill, #f8fafc) !important;
   color: var(--body-text-color, #0f172a) !important;
 }
+.dark .log-terminal textarea,
+.dark .log-terminal textarea:disabled,
+.dark .log-terminal textarea[disabled],
+[data-theme="dark"] .log-terminal textarea,
+[data-theme="dark"] .log-terminal textarea:disabled,
+[data-theme="dark"] .log-terminal textarea[disabled] {
+  background: #0b1220 !important;
+  color: #e2e8f0 !important;
+}
 .download-file {
   min-height: 0 !important;
-  border: 2px solid #10b981 !important; /* Emerald green border */
-  background: #ecfdf5 !important; /* Soft green background */
-  color: #065f46 !important; /* Dark green text */
+  border: 2px solid #10b981 !important;
+  background: #ecfdf5 !important;
+  color: #065f46 !important;
   font-weight: 700 !important;
   border-radius: 16px !important;
   transform: scale(1.02);
@@ -260,6 +268,25 @@ body {
 .download-file:hover {
   transform: scale(1.04);
   box-shadow: 0 12px 28px rgba(16, 185, 129, 0.35) !important;
+}
+
+/* Fix for Red Button */
+.gr-button.stop, .stop, .stop button, button.stop {
+    background: #dc2626 !important;
+    border-color: #dc2626 !important;
+    color: white !important;
+}
+.gr-button.stop:hover, .stop:hover, .stop button:hover, button.stop:hover {
+    background: #b91c1c !important;
+}
+
+/* Fix for Dark Mode Checkbox Visibility */
+.dark .gr-checkbox span, .dark .gr-checkbox label, [data-theme="dark"] .gr-checkbox label {
+    color: white !important;
+}
+.dark .gr-checkbox input[type="checkbox"]:not(:checked), [data-theme="dark"] .gr-checkbox input[type="checkbox"]:not(:checked) {
+    border: 1px solid #475569 !important;
+    background: #1e293b !important;
 }
 .dark .download-file, [data-theme="dark"] .download-file {
   border-color: #10b981 !important;
@@ -318,15 +345,26 @@ body {
   color: #e2e8f0 !important;
   border-color: rgba(71, 85, 105, 0.45) !important;
 }
-.dark input,
+.dark input:not([type="checkbox"]):not([type="radio"]),
 .dark textarea,
 .dark select,
-[data-theme="dark"] input,
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
 [data-theme="dark"] textarea,
 [data-theme="dark"] select {
-  background: #0b1220 !important;
+  background: transparent !important;
   color: #e2e8f0 !important;
   border-color: rgba(71, 85, 105, 0.7) !important;
+}
+.dark input[type="number"],
+[data-theme="dark"] input[type="number"] {
+  color-scheme: dark;
+}
+.dark input[type="number"]::-webkit-inner-spin-button,
+.dark input[type="number"]::-webkit-outer-spin-button,
+[data-theme="dark"] input[type="number"]::-webkit-inner-spin-button,
+[data-theme="dark"] input[type="number"]::-webkit-outer-spin-button {
+  filter: invert(1);
+  opacity: 0.85;
 }
 .dark .gr-button.secondary,
 [data-theme="dark"] .gr-button.secondary {
@@ -353,7 +391,12 @@ def build_header():
             type="button"
             aria-label="Toggle theme"
             data-theme="light"
-            onclick="(function(){const params=new URLSearchParams(window.location.search);const current=params.get('__theme')==='dark'?'dark':'light';const next=current==='dark'?'light':'dark';console.log('[theme-toggle] switching from '+current+' to '+next);window.location.assign('/?__theme='+next);})()"
+            onclick="(function(){
+                document.body.classList.toggle('dark');
+                const isDark = document.body.classList.contains('dark');
+                const toggle = document.getElementById('theme-toggle');
+                toggle.textContent = isDark ? '☀' : '☾';
+            })()"
           >☾</button>
         </header>
         """
@@ -419,9 +462,11 @@ def build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate):
         info="Acceptable variance for matching",
       )
 
+      confirm_clear = gr.Checkbox(label="Unlock 'Clear All' button", value=False)
+      
       with gr.Row():
         process_btn = gr.Button("🚀 Process Reconciliation", variant="primary", elem_classes="process-button")
-        clear_btn = gr.Button("🗑️ Clear All", variant="secondary")
+        clear_btn = gr.Button("🗑️ Clear All", variant="stop", elem_classes="stop")
 
   return (
     file_input,
@@ -429,6 +474,7 @@ def build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate):
     target_currency,
     exchange_rate,
     tolerance_threshold,
+    confirm_clear,
     process_btn,
     clear_btn,
   )
@@ -456,18 +502,14 @@ def build_results_panel():
                 next_page_btn = gr.Button("Next ▶", variant="secondary")
 
             with gr.Row():
-                pdf_btn = gr.Button("📄 Export PDF", variant="primary")
-                img_btn = gr.Button("🖼️ Export Image", variant="primary")
-
-            pdf_file = gr.DownloadButton("⬇️ Save PDF to Computer", visible=False, elem_classes="download-file")
-            img_file = gr.DownloadButton("⬇️ Save Image to Computer", visible=False, elem_classes="download-file")
+              pdf_btn = gr.DownloadButton("📄 Export PDF", variant="primary")
+              img_btn = gr.DownloadButton("🖼️ Export Image", variant="primary")
 
         with gr.Group(elem_classes="section-panel"):
             gr.Markdown("### Agent Log")
             log_output = gr.Textbox(
                 label="Output Log",
                 lines=16,
-                max_lines=18,
                 value="System ready. Waiting for input...",
                 interactive=False,
                 elem_classes="log-terminal",
@@ -481,7 +523,5 @@ def build_results_panel():
         next_page_btn,
         pdf_btn,
         img_btn,
-        pdf_file,
-        img_file,
         log_output,
     )

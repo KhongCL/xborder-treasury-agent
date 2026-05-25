@@ -4,7 +4,6 @@ import tempfile
 from datetime import datetime
 from typing import Any
 import math
-import asyncio
 import json
 
 import pandas as pd
@@ -12,17 +11,21 @@ import gradio as gr
 from PIL import Image, ImageDraw, ImageFont
 
 from tools import _DEMO_MYR_RATES
-import traceback
 from langchain_core.messages import HumanMessage
-from agent import app  # Import app directly
+import importlib
+import sys
 
 LOGS = []
+
 
 def log_message(message: str) -> str:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_entry = f"[{timestamp}] {message}"
     LOGS.append(log_entry)
+    if len(LOGS) > 40:
+        LOGS.pop(0)
     return "\n".join(LOGS)
+
 
 def _get_upload_extension(file_upload):
     if isinstance(file_upload, str):
@@ -33,6 +36,7 @@ def _get_upload_extension(file_upload):
         return os.path.splitext(file_upload.filename)[1].lower()
     return None
 
+
 def read_uploaded_csv(file_upload):
     if file_upload is None:
         raise ValueError("No file uploaded")
@@ -42,42 +46,40 @@ def read_uploaded_csv(file_upload):
         file_upload = file_upload[0]
 
     ext = _get_upload_extension(file_upload)
-    
+
     if isinstance(file_upload, str):
-        if ext in (".xls", ".xlsx"): return pd.read_excel(file_upload)
+        if ext in (".xls", ".xlsx"):
+            return pd.read_excel(file_upload)
         return pd.read_csv(file_upload)
     if hasattr(file_upload, "name") and isinstance(file_upload.name, str):
-        if ext in (".xls", ".xlsx"): return pd.read_excel(file_upload.name)
+        if ext in (".xls", ".xlsx"):
+            return pd.read_excel(file_upload.name)
         return pd.read_csv(file_upload.name)
     if hasattr(file_upload, "read"):
         file_upload.seek(0)
-        if ext in (".xls", ".xlsx"): return pd.read_excel(file_upload)
+        if ext in (".xls", ".xlsx"):
+            return pd.read_excel(file_upload)
         return pd.read_csv(file_upload)
-    
+
     raise ValueError("Unsupported upload type for CSV/Excel file")
 
+
 CURRENCY_CHOICES = sorted(_DEMO_MYR_RATES.keys())
+
 
 def get_exchange_rate(source_currency: str, target_currency: str) -> float:
     source = str(source_currency).upper().strip() if source_currency else "USD"
     target = str(target_currency).upper().strip() if target_currency else "MYR"
-    if source == target: return 1.0
-    if source not in _DEMO_MYR_RATES or target not in _DEMO_MYR_RATES: return 1.0
+    if source == target:
+        return 1.0
+    if source not in _DEMO_MYR_RATES or target not in _DEMO_MYR_RATES:
+        return 1.0
     return round(float(_DEMO_MYR_RATES[source]) / float(_DEMO_MYR_RATES[target]), 4)
 
-AMOUNT_COLUMNS = ("invoice_amount", "amount", "total_amount", "grand_total", "amount_paid")
-CURRENCY_COLUMNS = ("invoice_currency", "currency", "ccy")
-ID_COLUMNS = ("invoice_id", "invoice_number", "reference", "ref", "reference_id", "transaction_id")
-DATE_COLUMNS = ("invoice_date", "date", "payment_date", "transaction_date")
-
-def select_column(columns: dict[str, str], candidates: tuple[str, ...]) -> str | None:
-    for candidate in candidates:
-        if candidate in columns:
-            return columns[candidate]
-    return None
 
 def create_dataframe_image(df: pd.DataFrame) -> Image.Image:
-    if df is None or len(df) == 0: raise ValueError("No data available to export")
+    if df is None or len(df) == 0:
+        raise ValueError("No data available to export")
     font = ImageFont.load_default()
     padding_x = 12
     padding_y = 8
@@ -103,7 +105,12 @@ def create_dataframe_image(df: pd.DataFrame) -> Image.Image:
     draw = ImageDraw.Draw(image)
 
     x = y = 10
-    draw.rectangle([x, y, x + total_width - 20, y + header_height], fill="#f0f0f0", outline="black", width=1)
+    draw.rectangle(
+        [x, y, x + total_width - 20, y + header_height],
+        fill="#f0f0f0",
+        outline="black",
+        width=1,
+    )
     cell_x = x
     for idx, column in enumerate(df.columns):
         draw.text((cell_x + 4, y + 4), str(column), fill="black", font=font)
@@ -120,41 +127,44 @@ def create_dataframe_image(df: pd.DataFrame) -> Image.Image:
         y += row_height
     return image
 
+
 def save_dataframe_image(df: pd.DataFrame, filename: str) -> str:
     output_path = os.path.join(tempfile.gettempdir(), str(filename))
     create_dataframe_image(df).save(output_path, format="PNG")
     return output_path
+
 
 def save_dataframe_pdf(df: pd.DataFrame, filename: str) -> str:
     output_path = os.path.join(tempfile.gettempdir(), str(filename))
     create_dataframe_image(df).convert("RGB").save(output_path, format="PDF")
     return output_path
 
+
 def generate_pdf(results_df: pd.DataFrame):
     if results_df is None or len(results_df) == 0:
-        return gr.update(value=None, visible=False), log_message("ERROR: No reconciliation results available to export.")
+        return None, log_message("ERROR: No reconciliation results available to export.")
     try:
         filename = f"reconciliation_{int(datetime.now().timestamp())}.pdf"
         output_path = save_dataframe_pdf(results_df, filename)
         if not os.path.exists(output_path):
-            return gr.update(value=None, visible=False), log_message("ERROR: PDF generation failed.")
-        return gr.update(value=output_path, visible=True), log_message("✅ PDF generated successfully! Click the glowing button to save.")
+            return None, log_message("ERROR: PDF generation failed.")
+        return output_path, log_message("PDF generated successfully.")
     except Exception as exc:
-        return gr.update(value=None, visible=False), log_message(f"ERROR: PDF export failed - {exc}")
+        return None, log_message(f"ERROR: PDF export failed - {exc}")
+
 
 def generate_image(results_df: pd.DataFrame):
     if results_df is None or len(results_df) == 0:
-        return gr.update(value=None, visible=False), log_message("ERROR: No reconciliation results available to export.")
+        return None, log_message("ERROR: No reconciliation results available to export.")
     try:
         filename = f"reconciliation_{int(datetime.now().timestamp())}.png"
         output_path = save_dataframe_image(results_df, filename)
         if not os.path.exists(output_path):
-            return gr.update(value=None, visible=False), log_message("ERROR: Image generation failed.")
-        return gr.update(value=output_path, visible=True), log_message("✅ Image generated successfully! Click the glowing button to save.")
+            return None, log_message("ERROR: Image generation failed.")
+        return output_path, log_message("Image generated successfully.")
     except Exception as exc:
-        return gr.update(value=None, visible=False), log_message(f"ERROR: Image export failed - {exc}")
+        return None, log_message(f"ERROR: Image export failed - {exc}")
 
-# --- THE NEW ASYNC AGENT INTEGRATION ---
 
 async def process_reconciliation(
     file_upload,
@@ -162,41 +172,34 @@ async def process_reconciliation(
     target_currency: str,
     exchange_rate: float,
     tolerance_threshold: float,
-    results_store: pd.DataFrame,
 ):
     """
-    This is the async generator function that bridges Gradio to LangGraph.
-    It yields UI updates (dataframes and logs) in real-time as the agent thinks.
+    Async generator that streams the agent logs and produces the results table.
     """
-    if results_store is None:
-        results_store = pd.DataFrame()
-
-    def get_current_page_state(df):
-        p_df, curr_p, t_pages = paginate_dataframe(df, 1)
-        p_label = build_page_label(curr_p, t_pages)
-        return p_df, curr_p, p_label
-
-    page_df, current_page, page_label = get_current_page_state(results_store)
-
-    log_text = log_message(f"Starting Agentic Reconciliation...")
-    hidden_file = gr.update(value=None, visible=False)
-    yield page_df, log_text, results_store, current_page, page_label, hidden_file, hidden_file
+    log_text = log_message("Starting Agentic Reconciliation...")
+    pdf_path = None
+    img_path = None
+    yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", pdf_path, img_path
 
     if not file_upload:
         log_text = log_message("ERROR: No file uploaded")
-        yield page_df, log_text, results_store, current_page, page_label, hidden_file, hidden_file
+        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", pdf_path, img_path
         return
 
-    # Extract file path
     if isinstance(file_upload, str):
         filepath = file_upload
     else:
-        filepath = getattr(file_upload, "name", None) or getattr(file_upload, "filename", None) or str(file_upload)
+        filepath = (
+            getattr(file_upload, "name", None)
+            or getattr(file_upload, "filename", None)
+            or str(file_upload)
+        )
 
-    log_text = log_message(f"Uploading file: {os.path.basename(filepath)} to Agent Context.")
-    yield page_df, log_text, results_store, current_page, page_label, hidden_file, hidden_file
+    log_text = log_message(
+        f"Uploading file: {os.path.basename(filepath)} to Agent Context."
+    )
+    yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", pdf_path, img_path
 
-    # Construct the prompt instructing the LangGraph agent
     prompt = (
         f"I have an invoice located at '{filepath}'. "
         f"Please extract the data, convert it to {target_currency}, and search the local ledger "
@@ -208,81 +211,122 @@ async def process_reconciliation(
         "invoice_amount": 0.0,
         "invoice_currency": "",
         "converted_rm_amount": 0.0,
-        "reconciliation_status": "unprocessed"
+        "reconciliation_status": "unprocessed",
     }
 
+    results = []
+
     try:
-        # STREAM THE AGENT THOUGHTS LIVE
-        async for event in app.astream(initial_state):
+        if "agent" in sys.modules:
+            agent_module = importlib.reload(sys.modules["agent"])
+        else:
+            agent_module = importlib.import_module("agent")
+        app_instance = getattr(agent_module, "app")
+    except Exception as exc:
+        log_text = log_message(f"ERROR: Failed to initialize agent - {exc}")
+        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", pdf_path, img_path
+        return
+
+    try:
+        async for event in app_instance.astream(initial_state):
             for node_name, state_update in event.items():
                 messages = state_update.get("messages", [])
                 for msg in messages:
                     if hasattr(msg, "tool_calls") and msg.tool_calls:
-                        tool_name = msg.tool_calls[0]['name']
-                        log_text = log_message(f"⚙️ Agent executing tool: {tool_name}...")
-                        yield page_df, log_text, results_store, current_page, page_label, hidden_file, hidden_file
-                    
+                        tool_name = msg.tool_calls[0]["name"]
+                        log_text = log_message(
+                            f"⚙️ Agent executing tool: {tool_name}..."
+                        )
+                        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", pdf_path, img_path
                     elif hasattr(msg, "content") and msg.content:
                         if "<think>" in msg.content:
-                            clean_thought = msg.content.split("</think>")[0].replace("<think>", "").strip()
-                            log_text = log_message(f"🧠 Agent Reasoning: {clean_thought[:100]}...")
+                            clean_thought = (
+                                msg.content.split("</think>")[0]
+                                .replace("<think>", "")
+                                .strip()
+                            )
+                            log_text = log_message(
+                                f"🧠 Agent Reasoning: {clean_thought[:100]}..."
+                            )
                         else:
-                            log_text = log_message(f"✅ Agent Final Conclusion: \n{msg.content}")
-                        
-                        yield page_df, log_text, results_store, current_page, page_label, hidden_file, hidden_file
-                        
-                # Update the State tracking variables based on tool outputs
+                            log_text = log_message(
+                                f"✅ Agent Final Conclusion: \n{msg.content}"
+                            )
+                        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", pdf_path, img_path
+
                 if node_name == "tools":
-                     for msg in messages:
-                         if hasattr(msg, "content"):
-                             try:
-                                 # Parse tool output to build the UI Table row!
-                                 tool_data = json.loads(msg.content)
-                                 if "invoice_amount" in tool_data:
-                                     initial_state["invoice_amount"] = tool_data["invoice_amount"]
-                                     initial_state["invoice_currency"] = tool_data.get("currency", "USD")
-                                 if "converted_rm_amount" in tool_data:
-                                     initial_state["converted_rm_amount"] = tool_data["converted_rm_amount"]
-                                 if "status" in tool_data:
-                                     initial_state["reconciliation_status"] = tool_data["status"]
-                                     
-                                     # We reached the final tool, build and append the row!
-                                     new_row = {
-                                         "invoice_id": tool_data.get("invoice_id", "UNKNOWN"),
-                                         "invoice_amount": initial_state["invoice_amount"],
-                                         "invoice_currency": initial_state["invoice_currency"],
-                                         "converted_rm_amount": initial_state["converted_rm_amount"],
-                                         "status": tool_data["status"],
-                                         "reason": tool_data.get("reason", ""),
-                                         "variance_percent": tool_data.get("variance_percent", 0.0)
-                                     }
-                                     new_row_df = pd.DataFrame([new_row])
-                                     
-                                     # Append to the cumulative session data
-                                     if results_store.empty:
-                                         results_store = new_row_df
-                                     else:
-                                         results_store = pd.concat([results_store, new_row_df], ignore_index=True)
-                                         
-                                     page_df, current_page, page_label = get_current_page_state(results_store)
-                                     yield page_df, log_text, results_store, current_page, page_label, hidden_file, hidden_file
-                             except:
-                                 pass
+                    for msg in messages:
+                        if hasattr(msg, "content"):
+                            try:
+                                tool_data = json.loads(msg.content)
+                                if "invoice_amount" in tool_data:
+                                    initial_state["invoice_amount"] = tool_data[
+                                        "invoice_amount"
+                                    ]
+                                    initial_state["invoice_currency"] = tool_data.get(
+                                        "currency", "USD"
+                                    )
+                                if "converted_rm_amount" in tool_data:
+                                    initial_state["converted_rm_amount"] = tool_data[
+                                        "converted_rm_amount"
+                                    ]
+                                if "status" in tool_data:
+                                    initial_state["reconciliation_status"] = tool_data[
+                                        "status"
+                                    ]
+                                    results.append(
+                                        {
+                                            "invoice_id": tool_data.get(
+                                                "invoice_id", "UNKNOWN"
+                                            ),
+                                            "invoice_amount": initial_state["invoice_amount"],
+                                            "invoice_currency": initial_state["invoice_currency"],
+                                            "converted_rm_amount": initial_state[
+                                                "converted_rm_amount"
+                                            ],
+                                            "status": tool_data["status"],
+                                            "reason": tool_data.get("reason", ""),
+                                            "variance_percent": tool_data.get(
+                                                "variance_percent", 0.0
+                                            ),
+                                        }
+                                    )
+                            except Exception:
+                                pass
     except Exception as exc:
         error_message = str(exc)
         if "usage cap exceeded" in error_message.lower() or "402" in error_message:
             user_message = (
                 "ERROR: AI subscription usage cap exceeded. "
-                "Please check your API key credits."
+                "Please add balance to the Shoots/OpenAI account or use a valid paid API key."
             )
         else:
             user_message = f"ERROR: AI agent failed - {error_message}"
         log_text = log_message(user_message)
-        yield page_df, log_text, results_store, current_page, page_label, hidden_file, hidden_file
+        yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", pdf_path, img_path
         return
 
+    results_df = pd.DataFrame(results)
+    page_df, current_page, total_pages = paginate_dataframe(results_df, 1)
+    page_label = build_page_label(current_page, total_pages)
+
     log_text = log_message("Reconciliation workflow completed.")
-    yield page_df, log_text, results_store, current_page, page_label, hidden_file, hidden_file
+    if results_df is not None and len(results_df) > 0:
+        try:
+            pdf_path = save_dataframe_pdf(
+                results_df,
+                f"reconciliation_{int(datetime.now().timestamp())}.pdf",
+            )
+            img_path = save_dataframe_image(
+                results_df,
+                f"reconciliation_{int(datetime.now().timestamp())}.png",
+            )
+        except Exception as exc:
+            pdf_path = None
+            img_path = None
+            log_text = log_message(f"ERROR: Export generation failed - {exc}")
+
+    yield page_df, log_text, results_df, current_page, page_label, pdf_path, img_path
 
 
 def clear_logs():
@@ -290,22 +334,25 @@ def clear_logs():
     LOGS = []
     return ""
 
-def clear_file(): return None
 
 def clear_all():
     clear_logs()
-    hidden_file = gr.update(value=None, visible=False)
-    # This resets the cumulative session data back to an empty DataFrame!
-    return None, pd.DataFrame(), "", pd.DataFrame(), 1, "Page 0 of 0", hidden_file, hidden_file
+    return None, pd.DataFrame(), "", pd.DataFrame(), 1, "Page 0 of 0", None, None
 
-def paginate_dataframe(df: pd.DataFrame, page: int, page_size: int = 25) -> tuple[pd.DataFrame, int, int]:
-    if df is None or len(df) == 0: return pd.DataFrame(), 0, 0
+
+def paginate_dataframe(
+    df: pd.DataFrame, page: int, page_size: int = 25
+) -> tuple[pd.DataFrame, int, int]:
+    if df is None or len(df) == 0:
+        return pd.DataFrame(), 0, 0
     total_pages = max(1, math.ceil(len(df) / page_size))
     page = max(1, min(page, total_pages))
     start = (page - 1) * page_size
     end = start + page_size
     return df.iloc[start:end].reset_index(drop=True), page, total_pages
 
+
 def build_page_label(page: int, total_pages: int) -> str:
-    if total_pages == 0: return "Page 0 of 0"
+    if total_pages == 0:
+        return "Page 0 of 0"
     return f"Page {page} of {total_pages}"

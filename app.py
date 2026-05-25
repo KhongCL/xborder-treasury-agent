@@ -30,6 +30,7 @@ with gr.Blocks(
             target_currency,
             exchange_rate,
             tolerance_threshold,
+            confirm_clear,
             process_btn,
             clear_btn,
         ) = build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate)
@@ -41,8 +42,6 @@ with gr.Blocks(
             next_page_btn,
             pdf_btn,
             img_btn,
-            pdf_file,
-            img_file,
             log_output,
         ) = build_results_panel()
 
@@ -72,7 +71,6 @@ with gr.Blocks(
             target_currency,
             exchange_rate,
             tolerance_threshold,
-            results_store, # <-- This allows us to keep previous records!
         ],
         outputs=[
             results_output,
@@ -80,31 +78,29 @@ with gr.Blocks(
             results_store,
             current_page,
             page_indicator,
-            pdf_file,
-            img_file,
+            pdf_btn,
+            img_btn,
         ],
     )
 
+    def safe_clear(confirmed):
+        if not confirmed:
+            gr.Warning("Please check the 'Unlock' box first!")
+            return gr.skip(), gr.skip(), gr.skip(), gr.skip(), gr.skip(), gr.skip(), gr.skip(), gr.skip()
+        return clear_all()
+
     clear_btn.click(
-        fn=clear_all,
-        outputs=[
-            file_input,
-            results_output,
-            log_output,
-            results_store,
-            current_page,
-            page_indicator,
-            pdf_file,
-            img_file,
-        ],
+        fn=safe_clear,
+        inputs=[confirm_clear],
+        outputs=[file_input, results_output, log_output, results_store, current_page, page_indicator, pdf_btn, img_btn],
     )
 
     def change_page(results_df, current_page, direction):
         if results_df is None or len(results_df) == 0:
-            return pd.DataFrame(), 1, "Page 0 of 0"
+            return gr.update(value=None, visible=False), 1, "Page 0 of 0"
         next_page = max(1, min(current_page + direction, math.ceil(len(results_df) / 25)))
         page_df, page, total_pages = paginate_dataframe(results_df, next_page)
-        return page_df, page, build_page_label(page, total_pages)
+        return gr.update(value=page_df, visible=True), page, build_page_label(page, total_pages)
 
     prev_page_btn.click(
         fn=change_page,
@@ -116,18 +112,6 @@ with gr.Blocks(
         fn=change_page,
         inputs=[results_store, current_page, gr.State(1)],
         outputs=[results_output, current_page, page_indicator],
-    )
-
-    pdf_btn.click(
-        fn=generate_pdf,
-        inputs=[results_store],
-        outputs=[pdf_file, log_output],
-    )
-
-    img_btn.click(
-        fn=generate_image,
-        inputs=[results_store],
-        outputs=[img_file, log_output],
     )
 
     def init_logs():

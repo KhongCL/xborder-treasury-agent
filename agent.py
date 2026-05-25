@@ -24,7 +24,7 @@ class AgentState(TypedDict):
 # 3. Initialize the Shoots AI Brain
 # We use the OpenAI wrapper but hijack the base URL to point to the decentralized Shoots network
 llm = ChatOpenAI(
-    model="glm-4.7-flash",
+    model="deepseek-v4-flash",
     openai_api_key=MORPHEUS_API_KEY,
     openai_api_base="https://api.mor.org/api/v1",
     temperature=0.1 
@@ -61,6 +61,8 @@ def run_agent(state: AgentState):
             do not fail the match. Mark it as 'Matched with Fee Variance' and log the exact fee percentage.
             
             CRITICAL RULE 2: When calling the search_local_ledger tool, you MUST explicitly pass the extracted invoice_id. Never leave it null.
+            
+            CRITICAL RULE 3: Once you have successfully called the tools and matched the invoice, you MUST STOP. Output a final text summary of the reconciliation result and DO NOT invoke any further tools! If you keep invoking tools infinitely, you will be penalized.
             """)
     
     # Ensure the system prompt is always guiding the agent
