@@ -24,7 +24,7 @@ class AgentState(TypedDict):
 # 3. Initialize the Shoots AI Brain
 # We use the OpenAI wrapper but hijack the base URL to point to the decentralized Shoots network
 llm = ChatOpenAI(
-    model="deepseek-v4-flash",
+    model="qwen35-9b",
     openai_api_key=MORPHEUS_API_KEY,
     openai_api_base="https://api.mor.org/api/v1",
     temperature=0.1 
