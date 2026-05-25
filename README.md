@@ -12,6 +12,15 @@ pinned: false
 
 # Cross-Border Treasury Reconciliation Agent
 
+**Built for the AI Marathon 2026 - Global Treasury Agent Challenge**
+
+Small and Medium Enterprises (SMEs) lose hundreds of hours and thousands of dollars annually manually reconciling cross-border payments. When an invoice is billed for $100 USD, the local bank often receives RM 416.50 instead of the exact RM 425.00 exchange rate due to hidden intermediary bank fees. Traditional matching systems fail here.
+
+This autonomous AI agent solves this by:
+1. Extracting data directly from foreign payment proofs (PDFs/Images).
+2. Converting currencies using historical spot rates.
+3. Intelligently scanning local bank ledgers to detect **"Fee Variances"**—autonomously approving close matches that fall within a user-defined bank fee tolerance threshold (e.g., 3%).
+
 This repository is a Gradio + LangGraph prototype for reconciling foreign invoices against a local MYR bank ledger.
 
 The system is designed for a demo workflow:
@@ -57,6 +66,7 @@ Key ideas in this file:
 - `prev_page_btn.click(...)` and `next_page_btn.click(...)` call `change_page()` to show slices of the stored DataFrame.
 - `pdf_btn.click(...)` and `img_btn.click(...)` call the export helpers.
 - `demo.load(...)` clears old logs and writes the startup message when the app launches.
+- `safe_clear(...)` intercepts the clear button to ensure the "Unlock 'Clear All'" safety checkbox is ticked, preventing accidental data loss during live sessions.
 
 In practice, `app.py` does not implement business logic. It only coordinates UI events and shared state.
 
