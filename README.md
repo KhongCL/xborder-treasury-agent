@@ -14,12 +14,20 @@ pinned: false
 
 **Built for the AI Marathon 2026 - Global Treasury Agent Challenge**
 
+Live Demo: [https://huggingface.co/spaces/KhongCL/xborder-treasury-agent](https://huggingface.co/spaces/KhongCL/xborder-treasury-agent)
+
 Small and Medium Enterprises (SMEs) lose hundreds of hours and thousands of dollars annually manually reconciling cross-border payments. When an invoice is billed for $100 USD, the local bank often receives RM 416.50 instead of the exact RM 425.00 exchange rate due to hidden intermediary bank fees. Traditional matching systems fail here.
 
 This autonomous AI agent solves this by:
 1. Extracting data directly from foreign payment proofs (PDFs/Images).
 2. Converting currencies using historical spot rates.
 3. Intelligently scanning local bank ledgers to detect **"Fee Variances"**—autonomously approving close matches that fall within a user-defined bank fee tolerance threshold (e.g., 3%).
+
+<div align="center">
+  <img width="100%" alt="Xborder Dashboard" src="https://github.com/user-attachments/assets/a2b30612-ac7d-4deb-b530-29a971a9795b" />
+</div>
+<br>
+
 
 This repository is a Gradio + LangGraph prototype for reconciling foreign invoices against a local MYR bank ledger.
 
@@ -394,6 +402,9 @@ What you will see in the UI:
 ## Tutorial: run the bundled demo
 
 ### Scenario 1: perfect match
+<div align="center">
+  <img width="400" alt="Scenario 1 PDF" src="https://github.com/user-attachments/assets/c70412f9-3b5e-42ea-9049-424c87acb061" />
+</div>
 
 1. Start the app with `python app.py`.
 2. Upload `data/demo_invoices/invoice_perfect_match_INV-001.pdf` or `data/invoice_001.csv`.
@@ -409,6 +420,10 @@ Expected outcome:
 - Final status: `Matched`
 
 ### Scenario 2: bank fee variance
+<div align="center">
+  <img width="400" alt="Scenario 2 PDF" src="https://github.com/user-attachments/assets/60bc4442-3946-4ac3-adb5-24778e18dba2" />
+</div>
+
 
 Use `data/demo_invoices/invoice_close_match_INV-002.pdf` or `data/invoice_002.csv`.
 
@@ -422,6 +437,10 @@ Expected outcome:
 - Final status: `Matched with Fee Variance`
 
 ### Scenario 3: no match
+<div align="center">
+  <img width="400" alt="Scenario 3 PDF" src="https://github.com/user-attachments/assets/1ff43df4-ad54-4f76-9b87-3810a15169b0" />
+</div>
+
 
 Use `data/demo_invoices/invoice_no_match_INV-003.pdf` or `data/invoice_003.csv`.
 
