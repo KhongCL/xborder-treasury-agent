@@ -132,27 +132,27 @@ def save_dataframe_pdf(df: pd.DataFrame, filename: str) -> str:
 
 def generate_pdf(results_df: pd.DataFrame):
     if results_df is None or len(results_df) == 0:
-        return gr.update(value=None, visible=False), "ERROR: No reconciliation results available to export."
+        return gr.update(value=None, visible=False), log_message("ERROR: No reconciliation results available to export.")
     try:
         filename = f"reconciliation_{int(datetime.now().timestamp())}.pdf"
         output_path = save_dataframe_pdf(results_df, filename)
         if not os.path.exists(output_path):
-            return gr.update(value=None, visible=False), "ERROR: PDF generation failed."
-        return gr.update(value=output_path, visible=True), "PDF generated successfully."
+            return gr.update(value=None, visible=False), log_message("ERROR: PDF generation failed.")
+        return gr.update(value=output_path, visible=True), log_message("✅ PDF generated successfully! Click the glowing button to save.")
     except Exception as exc:
-        return gr.update(value=None, visible=False), f"ERROR: PDF export failed - {exc}"
+        return gr.update(value=None, visible=False), log_message(f"ERROR: PDF export failed - {exc}")
 
 def generate_image(results_df: pd.DataFrame):
     if results_df is None or len(results_df) == 0:
-        return gr.update(value=None, visible=False), "ERROR: No reconciliation results available to export."
+        return gr.update(value=None, visible=False), log_message("ERROR: No reconciliation results available to export.")
     try:
         filename = f"reconciliation_{int(datetime.now().timestamp())}.png"
         output_path = save_dataframe_image(results_df, filename)
         if not os.path.exists(output_path):
-            return gr.update(value=None, visible=False), "ERROR: Image generation failed."
-        return gr.update(value=output_path, visible=True), "Image generated successfully."
+            return gr.update(value=None, visible=False), log_message("ERROR: Image generation failed.")
+        return gr.update(value=output_path, visible=True), log_message("✅ Image generated successfully! Click the glowing button to save.")
     except Exception as exc:
-        return gr.update(value=None, visible=False), f"ERROR: Image export failed - {exc}"
+        return gr.update(value=None, visible=False), log_message(f"ERROR: Image export failed - {exc}")
 
 # --- THE NEW ASYNC AGENT INTEGRATION ---
 

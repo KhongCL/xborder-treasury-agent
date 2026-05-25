@@ -250,6 +250,8 @@ body {
   min-height: 0 !important;
   border: 2px solid #10b981 !important; /* Emerald green border */
   background: #ecfdf5 !important; /* Soft green background */
+  color: #065f46 !important; /* Dark green text */
+  font-weight: 700 !important;
   border-radius: 16px !important;
   transform: scale(1.02);
   transition: all 0.2s ease-in-out;
@@ -262,6 +264,7 @@ body {
 .dark .download-file, [data-theme="dark"] .download-file {
   border-color: #10b981 !important;
   background: rgba(16, 185, 129, 0.15) !important;
+  color: #34d399 !important; /* Light green text for dark mode */
 }
 .left-panel,
 .right-panel {
@@ -456,8 +459,8 @@ def build_results_panel():
                 pdf_btn = gr.Button("📄 Export PDF", variant="primary")
                 img_btn = gr.Button("🖼️ Export Image", variant="primary")
 
-            pdf_file = gr.File(label="Download PDF", file_count="single", type="filepath", visible=False, show_label=False, elem_classes="download-file")
-            img_file = gr.File(label="Download Image", file_count="single", type="filepath", visible=False, show_label=False, elem_classes="download-file")
+            pdf_file = gr.DownloadButton("⬇️ Save PDF to Computer", visible=False, elem_classes="download-file")
+            img_file = gr.DownloadButton("⬇️ Save Image to Computer", visible=False, elem_classes="download-file")
 
         with gr.Group(elem_classes="section-panel"):
             gr.Markdown("### Agent Log")
