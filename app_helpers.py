@@ -173,6 +173,9 @@ async def process_reconciliation(
     exchange_rate: float,
     tolerance_threshold: float,
 ):
+    """
+    Async generator that streams the agent logs and produces the results table.
+    """
     log_text = log_message("Starting Agentic Reconciliation...")
     pdf_path = None
     img_path = None
@@ -236,9 +239,6 @@ async def process_reconciliation(
                         )
                         yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", pdf_path, img_path
                     elif hasattr(msg, "content") and msg.content:
-                        if getattr(msg, "type", "") == "tool":
-                            continue 
-                            
                         if "<think>" in msg.content:
                             clean_thought = (
                                 msg.content.split("</think>")[0]
@@ -248,7 +248,7 @@ async def process_reconciliation(
                             log_text = log_message(
                                 f"🧠 Agent Reasoning: {clean_thought[:100]}..."
                             )
-                        elif not getattr(msg, "tool_calls", []):
+                        else:
                             log_text = log_message(
                                 f"✅ Agent Final Conclusion: \n{msg.content}"
                             )

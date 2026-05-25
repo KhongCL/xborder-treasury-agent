@@ -19,7 +19,7 @@ class AgentState(TypedDict):
     reconciliation_status: str
 
 llm = ChatOpenAI(
-    model="glm-5.1",
+    model="qwen35-9b",
     openai_api_key=MORPHEUS_API_KEY,
     openai_api_base="https://api.mor.org/api/v1",
     temperature=0.1 
@@ -29,8 +29,9 @@ tools = [extract_invoice_data, convert_currency, search_local_ledger]
 llm_with_tools = llm.bind_tools(tools)
 
 def run_agent(state: AgentState):
+    """The brain of the agent. Evaluates state and decides next action."""
     messages = state.get('messages', [])
-    
+
     system_prompt = SystemMessage(content="""
             You are a Global Treasury Reconciliation Agent. Your job is to match foreign invoices to local RM bank statements.
             
@@ -41,10 +42,10 @@ def run_agent(state: AgentState):
             
             CRITICAL RULE 3: Once you have successfully called the tools and matched the invoice, you MUST STOP. Output a final text summary of the reconciliation result and DO NOT invoke any further tools! If you keep invoking tools infinitely, you will be penalized.
             """)
-    
+
     if not messages or not isinstance(messages[0], SystemMessage):
         messages = [system_prompt] + messages
-        
+
     response = llm_with_tools.invoke(messages)
     return {"messages": [response]}
 
@@ -53,9 +54,10 @@ workflow = StateGraph(AgentState)
 tool_node = ToolNode(tools)
 
 def should_continue(state: AgentState):
+    """Return the next node to execute."""
     messages = state.get("messages", [])
     last_message = messages[-1]
-    
+
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
         return "tools"
     return END
@@ -74,6 +76,7 @@ workflow.add_edge("tools", "agent")
 app = workflow.compile()
 
 async def run_reconciliation_test(user_prompt: str):
+    """Streams the agent's thought trace step-by-step."""
     print(f"\n--- Starting Reconciliation Test ---")
     print(f"User Prompt: {user_prompt}\n")
     
