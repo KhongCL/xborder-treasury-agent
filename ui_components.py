@@ -248,6 +248,20 @@ body {
 }
 .download-file {
   min-height: 0 !important;
+  border: 2px solid #10b981 !important; /* Emerald green border */
+  background: #ecfdf5 !important; /* Soft green background */
+  border-radius: 16px !important;
+  transform: scale(1.02);
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25) !important;
+}
+.download-file:hover {
+  transform: scale(1.04);
+  box-shadow: 0 12px 28px rgba(16, 185, 129, 0.35) !important;
+}
+.dark .download-file, [data-theme="dark"] .download-file {
+  border-color: #10b981 !important;
+  background: rgba(16, 185, 129, 0.15) !important;
 }
 .left-panel,
 .right-panel {
