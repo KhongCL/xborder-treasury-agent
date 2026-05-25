@@ -1,5 +1,3 @@
-"""Tools for extracting structured information from treasury documents."""
-
 from __future__ import annotations
 
 import re
@@ -36,11 +34,6 @@ _NUMBER_TOKEN = r"[0-9][0-9,]*(?:\.[0-9]{1,2})?"
 
 
 def extract_invoice_data(file_path: str) -> dict[str, Any]:
-    """Extract an invoice total and currency from a PDF, spreadsheet, or text file.
-
-    The returned dictionary is safe for an agent tool call: failures are returned
-    as structured results instead of crashing the workflow.
-    """
     path = Path(file_path)
 
     if not path.exists():
@@ -72,7 +65,6 @@ def extract_invoice_data(file_path: str) -> dict[str, Any]:
         "invoice_date": invoice_date,
         "amount": amount,
         "currency": currency,
-        # These aliases align with the current AgentState field names.
         "invoice_amount": amount,
         "invoice_currency": currency,
     }
@@ -84,12 +76,6 @@ def search_local_ledger(
     ledger_path: str | None = None,
     tolerance_percent: float = 3.0,
 ) -> dict[str, Any]:
-    """Find an RM bank deposit matching a converted invoice total.
-
-    Providing ``invoice_id`` keeps independent demo invoices from matching each
-    other's deposits. A difference within ``tolerance_percent`` is treated as a
-    likely cross-border transfer fee rather than a failed payment.
-    """
     try:
         expected_amount = round(float(converted_amount), 2)
         tolerance = float(tolerance_percent)
@@ -198,11 +184,6 @@ def search_local_ledger(
 def convert_currency(
     amount: float, from_currency: str, to_currency: str = "MYR"
 ) -> dict[str, Any]:
-    """Convert an invoice amount to MYR using stable synthetic demo rates.
-
-    This prototype intentionally uses declared mock rates so judging is
-    reproducible and does not depend on an external foreign-exchange API.
-    """
     try:
         source_amount = round(float(amount), 2)
     except (TypeError, ValueError):

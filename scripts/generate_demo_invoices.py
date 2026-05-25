@@ -1,5 +1,3 @@
-"""Generate synthetic invoice PDFs for the hackathon demo."""
-
 from __future__ import annotations
 
 from pathlib import Path
