@@ -19,7 +19,7 @@ class AgentState(TypedDict):
     reconciliation_status: str
 
 llm = ChatOpenAI(
-    model="qwen35-9b",
+    model="glm-5.1",
     openai_api_key=MORPHEUS_API_KEY,
     openai_api_base="https://api.mor.org/api/v1",
     temperature=0.1 

@@ -394,6 +394,15 @@ body {
   background: #334155 !important;
   color: #e2e8f0 !important;
 }
+#exchange-rate input[type="number"]::-webkit-inner-spin-button,
+#exchange-rate input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#exchange-rate input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
 """
 
 
@@ -474,6 +483,7 @@ def build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate):
         value=get_exchange_rate("USD", "MYR"),
         info="Conversion rate (Source → Target)",
         interactive=False,
+        elem_id="exchange-rate",
       )
 
       tolerance_threshold = gr.Slider(
