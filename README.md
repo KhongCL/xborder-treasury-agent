@@ -24,7 +24,7 @@ This autonomous AI agent solves this by:
 3. Intelligently scanning local bank ledgers to detect **"Fee Variances"**—autonomously approving close matches that fall within a user-defined bank fee tolerance threshold (e.g., 3%).
 
 <div align="center">
-  <img width="1920" height="1216" alt="Cross-Border-Treasury-Reconciliation-Agent Dashboard" src="https://github.com/user-attachments/assets/3c836543-df6a-4ed2-9727-1083bee23590" />
+  <img width="1920" height="1193" alt="Cross-Border-Treasury-Reconciliation-Agent Dashboard" src="https://github.com/user-attachments/assets/120a7368-2a7c-47e1-857a-328009513c1b" />
 </div>
 <br>
 
