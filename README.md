@@ -588,6 +588,23 @@ Check:
 
 That is expected with the current implementation. The conversion tool is intentionally limited to `MYR`.
 
+## ☁️ Enterprise Cloud Deployment (Local Execution)
+While the Hugging Face Space demo utilizes a safe, local CSV ledger for zero-trust public testing, the core agent architecture is fully equipped for enterprise cloud integration via OAuth 2.0.
+
+When deployed locally by an SME, the agent autonomously syncs reconciliation results to Google Sheets and archives payment proofs to Google Drive, ensuring real-time financial collaboration across departments.
+
+<div align="center">
+  <img width="1920" height="880" alt="Google Sheets Sync Success" src="https://github.com/user-attachments/assets/407fc89c-5d8f-4664-929d-19a3d4ecdfe5" />
+  <br>
+  <em>The agent automatically formatting and appending fee variance adjustments to a cloud-based ledger.</em>
+</div>
+<br>
+<div align="center">
+  <img width="1920" height="880" alt="Google Drive Archival Success" src="https://github.com/user-attachments/assets/64969c9d-74d8-4184-a933-48dcea28f626" />
+  <br>
+  <em>Successful archival of the processed cross-border invoice to the corporate Google Drive repository.</em>
+</div>
+
 ## Suggested extension points
 
 If you want to evolve this prototype, the highest-value areas are:
