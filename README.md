@@ -131,9 +131,9 @@ One implementation detail to understand:
 
 Core parts:
 
-- `load_dotenv()` loads `MORPHEUS_API_KEY`
+- `load_dotenv()` loads `SHOOTS_API_KEY`
 - `AgentState` describes the shared graph state
-- `llm = ChatOpenAI(...)` configures the model client against the Morpheus endpoint
+- `llm = ChatOpenAI(...)` configures the model client against the Chutes endpoint
 - `tools = [extract_invoice_data, convert_currency, search_local_ledger]` defines the callable tool set
 - `run_agent(...)` prepends the system prompt and asks the LLM what to do next
 - `should_continue(...)` decides whether the graph should execute tools again or stop
@@ -358,7 +358,7 @@ This prototype uses fixed synthetic MYR rates from `tools.py` so the demo is rep
 ### Prerequisites
 
 - Python matching the Space config, ideally `3.13`
-- A Morpheus/Shoots API key exposed as `MORPHEUS_API_KEY`
+- A Shoots API key exposed as `SHOOTS_API_KEY`
 
 ### Install dependencies
 
@@ -373,10 +373,10 @@ python -m pip install -r requirements.txt
 Create a `.env` file in the project root:
 
 ```env
-MORPHEUS_API_KEY=your_api_key_here
+SHOOTS_API_KEY=your_chutes_pro_api_key_here
 ```
 
-`agent.py` loads this variable with `python-dotenv`.
+`agent.py` loads this variable with `python-dotenv` to securely connect to the Chutes decentralized inference network.
 
 ## Running the app
 
@@ -562,7 +562,7 @@ The PDF is probably scanned or image-only. This prototype needs text-based PDFs.
 
 Check:
 
-- `MORPHEUS_API_KEY` is present
+- `SHOOTS_API_KEY` is present
 - the key has usable credits/quota
 - the model endpoint configured in `agent.py` is reachable in your environment
 
