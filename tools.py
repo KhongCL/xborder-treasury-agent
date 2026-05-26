@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -21,6 +23,7 @@ _CURRENCY_COLUMNS = ("invoice_currency", "currency", "ccy")
 _ID_COLUMNS = ("invoice_id", "invoice_number", "reference", "ref")
 _DATE_COLUMNS = ("invoice_date", "date", "payment_date")
 _SUPPORTED_SUFFIXES = {".csv", ".xlsx", ".pdf", ".txt", ".md"}
+_OCR_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg"}
 _DEFAULT_LEDGER_PATH = Path(__file__).resolve().parent / "data" / "local_ledger.csv"
 _LEDGER_COLUMNS = ("transaction_id", "date", "reference", "amount_myr")
 _DEMO_MYR_RATES = {
@@ -75,6 +78,94 @@ def extract_invoice_data(file_path: str) -> dict[str, Any]:
         # These aliases align with the current AgentState field names.
         "invoice_amount": amount,
         "invoice_currency": currency,
+    }
+
+
+async def ocr_invoice_data(file_path: str) -> dict[str, Any]:
+    """OCR a scanned invoice image or PDF and extract invoice fields."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _ocr_invoice_data_sync, file_path)
+
+
+def _ocr_invoice_data_sync(file_path: str) -> dict[str, Any]:
+    path = Path(file_path)
+
+    if not path.exists():
+        return _failure(f"OCR file not found: {path}")
+
+    suffix = path.suffix.lower()
+    if suffix not in _OCR_IMAGE_SUFFIXES and suffix != ".pdf":
+        supported = ", ".join(sorted(_OCR_IMAGE_SUFFIXES | {".pdf"}))
+        return _failure(f"Unsupported OCR file type '{path.suffix}'. Use: {supported}.")
+
+    try:
+        import pytesseract
+        from pytesseract import Output
+    except ImportError:
+        return _failure("OCR requires pytesseract. Install project requirements first.")
+
+    tesseract_cmd = os.getenv("TESSERACT_CMD")
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
+    min_confidence = _read_float_env("OCR_MIN_CONFIDENCE", 55.0)
+
+    try:
+        if suffix == ".pdf":
+            try:
+                from pdf2image import convert_from_path
+            except ImportError:
+                return _failure(
+                    "OCR PDF support requires pdf2image. Install project requirements first."
+                )
+            poppler_path = os.getenv("POPPLER_PATH") or None
+            images = convert_from_path(
+                str(path), dpi=300, fmt="png", poppler_path=poppler_path
+            )
+        else:
+            try:
+                from PIL import Image
+            except ImportError:
+                return _failure(
+                    "OCR image support requires Pillow. Install project requirements first."
+                )
+            images = [Image.open(path)]
+    except Exception as exc:
+        return _failure(f"OCR file processing failed: {exc}")
+
+    text, confidence = _ocr_extract_text(images, pytesseract, Output)
+    if not text:
+        result = _failure("OCR produced no readable text.")
+        result["ocr_confidence"] = confidence
+        return result
+
+    if confidence < min_confidence:
+        result = _failure(
+            f"OCR confidence {confidence:.2f}% is below the minimum {min_confidence:.2f}%."
+        )
+        result["ocr_confidence"] = confidence
+        return result
+
+    extracted = _extract_from_text(text)
+    if extracted is None:
+        result = _failure(
+            "OCR text did not contain an identifiable amount and currency."
+        )
+        result["ocr_confidence"] = confidence
+        return result
+
+    amount, currency, invoice_id, invoice_date = extracted
+    return {
+        "success": True,
+        "source_file": path.name,
+        "source_format": path.suffix.lower().lstrip("."),
+        "invoice_id": invoice_id,
+        "invoice_date": invoice_date,
+        "amount": amount,
+        "currency": currency,
+        "invoice_amount": amount,
+        "invoice_currency": currency,
+        "ocr_confidence": confidence,
     }
 
 
@@ -234,6 +325,43 @@ def convert_currency(
         "converted_rm_amount": converted_amount,
         "calculation": f"{source_amount:.2f} {source_currency} x {rate:.2f} = RM {converted_amount:.2f}",
     }
+
+
+def _read_float_env(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _ocr_extract_text(images, pytesseract, output) -> tuple[str, float]:
+    text_chunks: list[str] = []
+    weighted_confidence = 0.0
+    total_tokens = 0
+
+    for image in images:
+        processed = image.convert("L")
+        data = pytesseract.image_to_data(processed, output_type=output.DICT)
+        text_chunks.append(pytesseract.image_to_string(processed))
+
+        for token, conf in zip(data.get("text", []), data.get("conf", [])):
+            if not token or not str(token).strip():
+                continue
+            try:
+                conf_value = float(conf)
+            except (TypeError, ValueError):
+                continue
+            if conf_value < 0:
+                continue
+            weighted_confidence += conf_value
+            total_tokens += 1
+
+    confidence = weighted_confidence / total_tokens if total_tokens else 0.0
+    full_text = "\n".join(chunk for chunk in text_chunks if chunk).strip()
+    return full_text, confidence
 
 
 def _read_table(path: Path) -> pd.DataFrame:

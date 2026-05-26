@@ -48,6 +48,7 @@ The application combines a UI, an agent loop, and deterministic tools:
 - `app_helpers.py` bridges the Gradio UI to the async LangGraph execution, stores session results, paginates tables, and generates exports.
 - `agent.py` builds the LangGraph workflow and binds the LLM to the reconciliation tools.
 - `tools.py` implements invoice extraction, MYR conversion, and local ledger matching.
+- `workspace_tools.py` handles OAuth 2.0 authentication and seamless export to Google Sheets and Google Drive.
 - `data/` contains demo invoices and the sample bank ledger.
 - `tests/test_tools.py` covers the deterministic tool layer.
 
@@ -287,6 +288,9 @@ The matching step first filters the ledger by `invoice_id` inside the transactio
 - `.xls`
 - `.xlsx`
 - `.pdf`
+- `.png`
+- `.jpg`
+- `.jpeg`
 
 ### Files supported by `extract_invoice_data()` directly
 
@@ -296,11 +300,14 @@ The matching step first filters the ledger by `invoice_id` inside the transactio
 - `.txt`
 - `.md`
 
+For scanned PDFs or image invoices, use `ocr_invoice_data()`.
+
 Important limitations:
 
 - PDF support is text extraction only via `pypdf`.
-- OCR is not implemented for scanned images.
-- Image files such as `.png` and `.jpg` are not supported by the current tool layer.
+- OCR uses Tesseract via `pytesseract` and requires a local Tesseract install.
+- OCR text extraction via Tesseract reads strictly left-to-right. Complex multi-column invoice layouts may require advanced layout-aware Vision models (VLMs) for perfect extraction. For best results in this demo, use the original text-based PDFs.
+- Scanned PDFs require Poppler for `pdf2image`.
 
 ## Data expectations
 
@@ -374,9 +381,20 @@ Create a `.env` file in the project root:
 
 ```env
 SHOOTS_API_KEY=your_chutes_pro_api_key_here
+GOOGLE_SHEETS_SPREADSHEET_ID=your_sheet_id
+GOOGLE_SHEETS_WORKSHEET=Reconciliation
+GOOGLE_DRIVE_FOLDER_ID=your_drive_folder_id
+GOOGLE_OAUTH_CLIENT_SECRET=client_secret.json
+GOOGLE_OAUTH_TOKEN_FILE=token.pickle
+TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
+POPPLER_PATH=C:\Program Files\poppler-24.02.0\Library\bin
 ```
 
 `agent.py` loads this variable with `python-dotenv` to securely connect to the Chutes decentralized inference network.
+
+**⚠️ Google Workspace Integration & OAuth Note:**
+The integration with Google Sheets and Google Drive utilizes OAuth 2.0. When you trigger a cloud sync for the first time locally, a browser window will open asking you to log into your Google account to authorize the app, generating a `token.pickle` file. 
+*If deployed to a headless cloud environment (like a Hugging Face Space), the app safely bypasses the Google Workspace sync and relies entirely on the local `results_store` to prevent crashes.*
 
 ## Running the app
 
@@ -574,12 +592,11 @@ That is expected with the current implementation. The conversion tool is intenti
 
 If you want to evolve this prototype, the highest-value areas are:
 
-- add OCR for image and scanned PDF invoices
-- support live FX providers instead of synthetic rates
-- let the UI choose a non-MYR settlement currency end to end
-- store reconciliation history in a database instead of Gradio session state
-- expand ledger matching beyond invoice-reference containment
-- add integration tests for the Gradio-to-LangGraph bridge
+- Upgrade the current Tesseract OCR pipeline with advanced layout-aware Vision-Language Models (VLMs) for unstructured receipts.
+- Support live FX API providers instead of synthetic historical rates.
+- Let the UI choose a non-MYR settlement currency end to end.
+- Expand the current Google Sheets database integration to support enterprise SQL databases (e.g., PostgreSQL).
+- Expand ledger matching beyond invoice-reference containment to include fuzzy-matching on vendor names.
 
 ## Repository layout
 

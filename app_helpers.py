@@ -11,6 +11,7 @@ import gradio as gr
 from PIL import Image, ImageDraw, ImageFont
 
 from tools import _DEMO_MYR_RATES
+from workspace_tools import save_report_to_sheets, upload_invoice_to_drive
 from langchain_core.messages import HumanMessage
 import importlib
 import sys
@@ -172,6 +173,8 @@ async def process_reconciliation(
     target_currency: str,
     exchange_rate: float,
     tolerance_threshold: float,
+    sync_to_sheets: bool,
+    upload_to_drive: bool,
 ):
     """
     Async generator that streams the agent logs and produces the results table.
@@ -329,6 +332,34 @@ async def process_reconciliation(
             img_path = None
             log_text = log_message(f"ERROR: Export generation failed - {exc}")
 
+    if sync_to_sheets:
+        if results_df is None or len(results_df) == 0:
+            log_text = log_message("ERROR: No results to sync to Google Sheets.")
+            yield page_df, log_text, results_df, current_page, page_label, pdf_path, img_path
+        else:
+            log_text = log_message("Syncing reconciliation results to Google Sheets...")
+            yield page_df, log_text, results_df, current_page, page_label, pdf_path, img_path
+            sheet_result = await save_report_to_sheets(results_df)
+            if sheet_result.get("success"):
+                log_text = log_message("Google Sheets sync completed.")
+            else:
+                log_text = log_message(
+                    f"ERROR: Google Sheets sync failed - {sheet_result.get('error', 'Unknown error')}"
+                )
+            yield page_df, log_text, results_df, current_page, page_label, pdf_path, img_path
+
+    if upload_to_drive:
+        log_text = log_message("Uploading invoice to Google Drive...")
+        yield page_df, log_text, results_df, current_page, page_label, pdf_path, img_path
+        drive_result = await upload_invoice_to_drive(filepath)
+        if drive_result.get("success"):
+            log_text = log_message("Google Drive upload completed.")
+        else:
+            log_text = log_message(
+                f"ERROR: Google Drive upload failed - {drive_result.get('error', 'Unknown error')}"
+            )
+        yield page_df, log_text, results_df, current_page, page_label, pdf_path, img_path
+
     yield page_df, log_text, results_df, current_page, page_label, pdf_path, img_path
 
 
@@ -340,7 +371,18 @@ def clear_logs():
 
 def clear_all():
     clear_logs()
-    return None, pd.DataFrame(), "", pd.DataFrame(), 1, "Page 0 of 0", None, None
+    return (
+        None,
+        pd.DataFrame(),
+        "",
+        pd.DataFrame(),
+        1,
+        "Page 0 of 0",
+        None,
+        None,
+        False,
+        False,
+    )
 
 
 def paginate_dataframe(

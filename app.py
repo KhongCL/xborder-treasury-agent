@@ -30,6 +30,8 @@ with gr.Blocks(
             target_currency,
             exchange_rate,
             tolerance_threshold,
+            sync_to_sheets,
+            upload_to_drive,
             confirm_clear,
             process_btn,
             clear_btn,
@@ -71,6 +73,8 @@ with gr.Blocks(
             target_currency,
             exchange_rate,
             tolerance_threshold,
+            sync_to_sheets,
+            upload_to_drive,
         ],
         outputs=[
             results_output,
@@ -86,13 +90,35 @@ with gr.Blocks(
     def safe_clear(confirmed):
         if not confirmed:
             gr.Warning("Please check the 'Unlock' box first!")
-            return gr.skip(), gr.skip(), gr.skip(), gr.skip(), gr.skip(), gr.skip(), gr.skip(), gr.skip()
+            return (
+                gr.skip(),
+                gr.skip(),
+                gr.skip(),
+                gr.skip(),
+                gr.skip(),
+                gr.skip(),
+                gr.skip(),
+                gr.skip(),
+                gr.skip(),
+                gr.skip(),
+            )
         return clear_all()
 
     clear_btn.click(
         fn=safe_clear,
         inputs=[confirm_clear],
-        outputs=[file_input, results_output, log_output, results_store, current_page, page_indicator, pdf_btn, img_btn],
+        outputs=[
+            file_input,
+            results_output,
+            log_output,
+            results_store,
+            current_page,
+            page_indicator,
+            pdf_btn,
+            img_btn,
+            sync_to_sheets,
+            upload_to_drive,
+        ],
     )
 
     def change_page(results_df, current_page, direction):

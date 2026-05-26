@@ -445,7 +445,7 @@ def build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate):
         file_input = gr.File(
           label="Upload CSV/Excel/PDF File",
           file_count="single",
-          file_types=[".csv", ".xls", ".xlsx", ".pdf"],
+          file_types=[".csv", ".xls", ".xlsx", ".pdf", ".png", ".jpg", ".jpeg"],
           type="filepath",
           show_label=False,
         )
@@ -495,6 +495,17 @@ def build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate):
         info="Acceptable variance for matching",
       )
 
+      with gr.Group():
+        gr.Markdown("#### Google Workspace")
+        sync_to_sheets = gr.Checkbox(
+          label="Sync results to Google Sheets",
+          value=False,
+        )
+        upload_to_drive = gr.Checkbox(
+          label="Upload invoice to Google Drive",
+          value=False,
+        )
+
       confirm_clear = gr.Checkbox(label="Unlock 'Clear All' button", value=False)
       
       with gr.Row():
@@ -507,6 +518,8 @@ def build_configuration_panel(CURRENCY_CHOICES, get_exchange_rate):
     target_currency,
     exchange_rate,
     tolerance_threshold,
+    sync_to_sheets,
+    upload_to_drive,
     confirm_clear,
     process_btn,
     clear_btn,
