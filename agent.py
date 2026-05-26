@@ -9,7 +9,7 @@ from tools import extract_invoice_data, convert_currency, search_local_ledger
 import asyncio
 
 load_dotenv()
-MORPHEUS_API_KEY = os.getenv("MORPHEUS_API_KEY")
+SHOOTS_API_KEY = os.getenv("SHOOTS_API_KEY")
 
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], lambda a, b: a + b]
@@ -19,9 +19,9 @@ class AgentState(TypedDict):
     reconciliation_status: str
 
 llm = ChatOpenAI(
-    model="glm-5.1",
-    openai_api_key=MORPHEUS_API_KEY,
-    openai_api_base="https://api.mor.org/api/v1",
+    model="google/gemma-4-31B-turbo-TEE",
+    openai_api_key=SHOOTS_API_KEY,
+    openai_api_base="https://llm.chutes.ai/v1",
     temperature=0.1 
 )
 

@@ -239,6 +239,9 @@ async def process_reconciliation(
                         )
                         yield pd.DataFrame(), log_text, pd.DataFrame(), 1, "Page 0 of 0", pdf_path, img_path
                     elif hasattr(msg, "content") and msg.content:
+                        if getattr(msg, "type", "") == "tool" or (hasattr(msg, "name") and msg.name):
+                            continue 
+                            
                         if "<think>" in msg.content:
                             clean_thought = (
                                 msg.content.split("</think>")[0]
@@ -248,7 +251,7 @@ async def process_reconciliation(
                             log_text = log_message(
                                 f"🧠 Agent Reasoning: {clean_thought[:100]}..."
                             )
-                        else:
+                        elif not getattr(msg, "tool_calls", []):
                             log_text = log_message(
                                 f"✅ Agent Final Conclusion: \n{msg.content}"
                             )
