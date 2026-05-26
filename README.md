@@ -28,7 +28,6 @@ This autonomous AI agent solves this by:
 </div>
 <br>
 
-
 This repository is a Gradio + LangGraph prototype for reconciling foreign invoices against a local MYR bank ledger.
 
 The system is designed for a demo workflow:
@@ -195,6 +194,17 @@ This function:
 
 The reference filter is a deliberate safety mechanism. Without it, the nearest amount could belong to the wrong invoice.
 
+### `workspace_tools.py`
+
+`workspace_tools.py` manages the OAuth 2.0 authentication flow and API interactions with Google Workspace for the enterprise cloud deployment logic.
+
+Core functions:
+- `get_google_creds()`: Handles the OAuth 2.0 browser login flow and caches the credentials in `token.pickle` for subsequent runs.
+- `save_report_to_sheets(dataframe)`: Connects to the Google Sheets API and appends the final reconciliation result as a new row to a cloud-based ledger.
+- `upload_invoice_to_drive(file_path)`: Connects to the Google Drive API and uploads the processed invoice to a designated corporate archive folder.
+
+This file ensures that sensitive operations (like updating a corporate ledger) are executed securely via user-consented OAuth tokens rather than hardcoded service account machine keys.
+
 ### `tests/test_tools.py`
 
 The tests focus on the deterministic layer rather than the full UI or LLM path.
@@ -325,6 +335,7 @@ Example CSV:
 ```csv
 invoice_id,invoice_date,currency,amount,customer,description
 INV-001,2026-05-24,USD,100.00,Acme Export Ltd,International consulting invoice
+
 ```
 
 For text and PDF inputs, the extractor looks for labels such as `Grand Total`, `Total`, `Amount`, and currency tokens like `USD`, `EUR`, `SGD`, `MYR`, `RM`, `$`, `EUR`, `S$`, and `GBP`.
@@ -333,10 +344,10 @@ For text and PDF inputs, the extractor looks for labels such as `Grand Total`, `
 
 The local ledger CSV must contain these normalized columns:
 
-- `transaction_id`
-- `date`
-- `reference`
-- `amount_myr`
+* `transaction_id`
+* `date`
+* `reference`
+* `amount_myr`
 
 Bundled demo ledger:
 
@@ -346,6 +357,7 @@ TXN001,2026-05-24,INV-001 PAYMENT,425.00
 TXN002,2026-05-24,INV-002 PAYMENT,416.50
 TXN003,2026-05-24,UNKNOWN PAYMENT,90.00
 TXN004,2026-05-23,OFFICE SUPPLIES,150.00
+
 ```
 
 ## Demo FX rates
@@ -364,8 +376,13 @@ This prototype uses fixed synthetic MYR rates from `tools.py` so the demo is rep
 
 ### Prerequisites
 
-- Python matching the Space config, ideally `3.13`
-- A Shoots API key exposed as `SHOOTS_API_KEY`
+* Python matching the Space config, ideally `3.13`.
+* A Shoots API key exposed as `SHOOTS_API_KEY`.
+* **For OCR Support:**
+* **Windows:** Download and install [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki) and [Poppler for Windows](https://github.com/oschwartz10612/poppler-windows/releases/). Ensure you note their installation paths.
+* **Linux/Mac:** Install via package manager (e.g., `sudo apt-get install tesseract-ocr poppler-utils`).
+
+
 
 ### Install dependencies
 
@@ -373,7 +390,18 @@ This prototype uses fixed synthetic MYR rates from `tools.py` so the demo is rep
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+
 ```
+
+### Google Workspace Setup (OAuth 2.0)
+
+To enable the Google Drive and Sheets integration:
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a new project and enable the **Google Drive API** and **Google Sheets API**.
+3. Go to **APIs & Services > OAuth consent screen**, set it to **External**, and add your testing email address as a "Test User".
+4. Go to **Credentials**, click **Create Credentials > OAuth client ID** (Desktop App).
+5. Download the JSON file, rename it to `client_secret.json`, and place it in the root directory of this project.
 
 ### Configure the environment
 
@@ -388,12 +416,13 @@ GOOGLE_OAUTH_CLIENT_SECRET=client_secret.json
 GOOGLE_OAUTH_TOKEN_FILE=token.pickle
 TESSERACT_CMD=C:\\Program Files\\Tesseract-OCR\\tesseract.exe
 POPPLER_PATH=C:\\Program Files\\poppler-26.02.0\\Library\\bin
+
 ```
 
 `agent.py` loads this variable with `python-dotenv` to securely connect to the Chutes decentralized inference network.
 
 **⚠️ Google Workspace Integration & OAuth Note:**
-The integration with Google Sheets and Google Drive utilizes OAuth 2.0. When you trigger a cloud sync for the first time locally, a browser window will open asking you to log into your Google account to authorize the app, generating a `token.pickle` file. 
+The integration with Google Sheets and Google Drive utilizes OAuth 2.0. When you trigger a cloud sync for the first time locally, a browser window will open asking you to log into your Google account to authorize the app, generating a `token.pickle` file.
 *If deployed to a headless cloud environment (like a Hugging Face Space), the app safely bypasses the Google Workspace sync and relies entirely on the local `results_store` to prevent crashes.*
 
 ## Running the app
@@ -402,6 +431,7 @@ Start the Gradio UI locally:
 
 ```bash
 python app.py
+
 ```
 
 What you will see in the UI:
@@ -432,42 +462,40 @@ What you will see in the UI:
 
 Expected outcome:
 
-- Extracted invoice: `USD 100.00`
-- Converted amount: `RM 425.00`
-- Matching ledger row: `TXN001`
-- Final status: `Matched`
+* Extracted invoice: `USD 100.00`
+* Converted amount: `RM 425.00`
+* Matching ledger row: `TXN001`
+* Final status: `Matched`
 
 ### Scenario 2: bank fee variance
 <div align="center">
   <img width="400" alt="Scenario 2 PDF" src="https://github.com/user-attachments/assets/60bc4442-3946-4ac3-adb5-24778e18dba2" />
 </div>
 
-
 Use `data/demo_invoices/invoice_close_match_INV-002.pdf` or `data/invoice_002.csv`.
 
 Expected outcome:
 
-- Extracted invoice: `USD 100.00`
-- Converted amount: `RM 425.00`
-- Matching ledger row: `TXN002`
-- Actual received amount: `RM 416.50`
-- Variance: `2.00%`
-- Final status: `Matched with Fee Variance`
+* Extracted invoice: `USD 100.00`
+* Converted amount: `RM 425.00`
+* Matching ledger row: `TXN002`
+* Actual received amount: `RM 416.50`
+* Variance: `2.00%`
+* Final status: `Matched with Fee Variance`
 
 ### Scenario 3: no match
 <div align="center">
   <img width="400" alt="Scenario 3 PDF" src="https://github.com/user-attachments/assets/1ff43df4-ad54-4f76-9b87-3810a15169b0" />
 </div>
 
-
 Use `data/demo_invoices/invoice_no_match_INV-003.pdf` or `data/invoice_003.csv`.
 
 Expected outcome:
 
-- Extracted invoice: `EUR 200.00`
-- Converted amount: `RM 960.00`
-- No ledger reference match for `INV-003`
-- Final status: `Unmatched`
+* Extracted invoice: `EUR 200.00`
+* Converted amount: `RM 960.00`
+* No ledger reference match for `INV-003`
+* Final status: `Unmatched`
 
 ## Running the tool tests
 
@@ -475,16 +503,17 @@ The deterministic reconciliation tools can be tested without launching the UI:
 
 ```bash
 python -m unittest tests/test_tools.py
+
 ```
 
 The current test suite covers:
 
-- structured CSV extraction
-- text/PDF extraction
-- exact ledger matches
-- fee-variance matches
-- unmatched ledger searches
-- synthetic currency conversion
+* structured CSV extraction
+* text/PDF extraction
+* exact ledger matches
+* fee-variance matches
+* unmatched ledger searches
+* synthetic currency conversion
 
 ## Running the agent test harness
 
@@ -492,12 +521,14 @@ The current test suite covers:
 
 ```bash
 python agent.py
+
 ```
 
 By default it runs this prompt against `./data/invoice_001.csv`:
 
 ```text
 I have an invoice located at './data/invoice_001.csv'. Please extract, convert, and search the ./data/local_ledger.csv for a match.
+
 ```
 
 This is useful if you want to inspect the raw LangGraph loop outside the Gradio UI.
@@ -506,8 +537,8 @@ This is useful if you want to inspect the raw LangGraph loop outside the Gradio 
 
 After one or more reconciliations, the app can export the cumulative session table:
 
-- `Export PDF` generates a PDF in the temporary directory and exposes a download button.
-- `Export Image` generates a PNG in the temporary directory and exposes a download button.
+* `Export PDF` generates a PDF in the temporary directory and exposes a download button.
+* `Export Image` generates a PNG in the temporary directory and exposes a download button.
 
 Exports are generated by rendering the DataFrame into an image first, then optionally converting that image to PDF.
 
@@ -530,6 +561,7 @@ result = search_local_ledger(
 print(invoice)
 print(fx)
 print(result)
+
 ```
 
 ## Demo assets
@@ -540,6 +572,7 @@ To regenerate them:
 
 ```bash
 python scripts/generate_demo_invoices.py
+
 ```
 
 That script uses `reportlab` and produces three scenarios:
@@ -554,13 +587,13 @@ That script uses `reportlab` and produces three scenarios:
 
 These are current behavior details worth knowing before you modify the system:
 
-- The prototype is MYR-settlement focused. `convert_currency()` only supports conversion into `MYR`.
-- The UI lets you choose a target currency, but the tool layer will reject non-MYR targets.
-- The source currency dropdown updates the displayed exchange rate, but the actual conversion step uses the currency extracted from the uploaded invoice.
-- The displayed exchange rate in the UI is informational only. The conversion tool uses `_DEMO_MYR_RATES` from `tools.py`.
-- Results accumulate across multiple runs in one session until `Clear All` is pressed.
-- Pagination is fixed at 25 rows per page.
-- The UI import path goes through `app_helpers.py`, which imports `agent.py`, so the app needs a valid API key even though the tool tests do not.
+* The prototype is MYR-settlement focused. `convert_currency()` only supports conversion into `MYR`.
+* The UI lets you choose a target currency, but the tool layer will reject non-MYR targets.
+* The source currency dropdown updates the displayed exchange rate, but the actual conversion step uses the currency extracted from the uploaded invoice.
+* The displayed exchange rate in the UI is informational only. The conversion tool uses `_DEMO_MYR_RATES` from `tools.py`.
+* Results accumulate across multiple runs in one session until `Clear All` is pressed.
+* Pagination is fixed at 25 rows per page.
+* The UI import path goes through `app_helpers.py`, which imports `agent.py`, so the app needs a valid API key even though the tool tests do not.
 
 ## Troubleshooting
 
@@ -570,6 +603,7 @@ Install the project requirements first:
 
 ```bash
 python -m pip install -r requirements.txt
+
 ```
 
 ### PDF extraction returns no invoice data
@@ -580,15 +614,16 @@ The PDF is probably scanned or image-only. This prototype needs text-based PDFs.
 
 Check:
 
-- `SHOOTS_API_KEY` is present
-- the key has usable credits/quota
-- the model endpoint configured in `agent.py` is reachable in your environment
+* `SHOOTS_API_KEY` is present
+* the key has usable credits/quota
+* the model endpoint configured in `agent.py` is reachable in your environment
 
 ### A non-MYR target currency fails
 
 That is expected with the current implementation. The conversion tool is intentionally limited to `MYR`.
 
 ## ☁️ Enterprise Cloud Deployment (Local Execution)
+
 While the Hugging Face Space demo utilizes a safe, local CSV ledger for zero-trust public testing, the core agent architecture is fully equipped for enterprise cloud integration via OAuth 2.0.
 
 When deployed locally by an SME, the agent autonomously syncs reconciliation results to Google Sheets and archives payment proofs to Google Drive, ensuring real-time financial collaboration across departments.
@@ -609,11 +644,11 @@ When deployed locally by an SME, the agent autonomously syncs reconciliation res
 
 If you want to evolve this prototype, the highest-value areas are:
 
-- Upgrade the current Tesseract OCR pipeline with advanced layout-aware Vision-Language Models (VLMs) for unstructured receipts.
-- Support live FX API providers instead of synthetic historical rates.
-- Let the UI choose a non-MYR settlement currency end to end.
-- Expand the current Google Sheets database integration to support enterprise SQL databases (e.g., PostgreSQL).
-- Expand ledger matching beyond invoice-reference containment to include fuzzy-matching on vendor names.
+* Upgrade the current Tesseract OCR pipeline with advanced layout-aware Vision-Language Models (VLMs) for unstructured receipts.
+* Support live FX API providers instead of synthetic historical rates.
+* Let the UI choose a non-MYR settlement currency end to end.
+* Expand the current Google Sheets database integration to support enterprise SQL databases (e.g., PostgreSQL).
+* Expand ledger matching beyond invoice-reference containment to include fuzzy-matching on vendor names.
 
 ## Repository layout
 
@@ -636,15 +671,16 @@ If you want to evolve this prototype, the highest-value areas are:
 |   `-- generate_demo_invoices.py
 `-- tests/
     `-- test_tools.py
+
 ```
 
 ## Summary
 
 This codebase is a demo-oriented reconciliation system with:
 
-- a polished Gradio front end
-- an LLM agent loop orchestrated with LangGraph
-- deterministic extraction, FX conversion, and ledger-matching tools
-- bundled demo data for exact-match, fee-variance, and unmatched scenarios
+* a polished Gradio front end
+* an LLM agent loop orchestrated with LangGraph
+* deterministic extraction, FX conversion, and ledger-matching tools
+* bundled demo data for exact-match, fee-variance, and unmatched scenarios
 
 Keep the YAML front matter at the top of this file if you deploy the project as a Hugging Face Space.
