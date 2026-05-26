@@ -378,7 +378,8 @@ This prototype uses fixed synthetic MYR rates from `tools.py` so the demo is rep
 
 * Python matching the Space config, ideally `3.13`.
 * A Shoots API key exposed as `SHOOTS_API_KEY`.
-* **For OCR Support:**
+
+**For OCR Support:**
 * **Windows:** Download and install [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki) and [Poppler for Windows](https://github.com/oschwartz10612/poppler-windows/releases/). Ensure you note their installation paths.
 * **Linux/Mac:** Install via package manager (e.g., `sudo apt-get install tesseract-ocr poppler-utils`).
 
@@ -422,6 +423,7 @@ POPPLER_PATH=C:\\Program Files\\poppler-26.02.0\\Library\\bin
 `agent.py` loads this variable with `python-dotenv` to securely connect to the Chutes decentralized inference network.
 
 **⚠️ Google Workspace Integration & OAuth Note:**
+
 The integration with Google Sheets and Google Drive utilizes OAuth 2.0. When you trigger a cloud sync for the first time locally, a browser window will open asking you to log into your Google account to authorize the app, generating a `token.pickle` file.
 *If deployed to a headless cloud environment (like a Hugging Face Space), the app safely bypasses the Google Workspace sync and relies entirely on the local `results_store` to prevent crashes.*
 
