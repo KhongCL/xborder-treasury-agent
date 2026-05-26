@@ -386,8 +386,8 @@ GOOGLE_SHEETS_WORKSHEET=Reconciliation
 GOOGLE_DRIVE_FOLDER_ID=your_drive_folder_id
 GOOGLE_OAUTH_CLIENT_SECRET=client_secret.json
 GOOGLE_OAUTH_TOKEN_FILE=token.pickle
-TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
-POPPLER_PATH=C:\Program Files\poppler-24.02.0\Library\bin
+TESSERACT_CMD=C:\\Program Files\\Tesseract-OCR\\tesseract.exe
+POPPLER_PATH=C:\\Program Files\\poppler-26.02.0\\Library\\bin
 ```
 
 `agent.py` loads this variable with `python-dotenv` to securely connect to the Chutes decentralized inference network.
@@ -624,6 +624,7 @@ If you want to evolve this prototype, the highest-value areas are:
 |-- app_helpers.py
 |-- ui_components.py
 |-- tools.py
+|-- workspace_tools.py
 |-- requirements.txt
 |-- data/
 |   |-- local_ledger.csv
