@@ -20,7 +20,7 @@ class AgentState(TypedDict):
     reconciliation_status: str
 
 llm = ChatOpenAI(
-    model="google/gemma-4-31B-turbo-TEE",
+    model="Qwen/Qwen3.5-397B-A17B-TEE",
     openai_api_key=SHOOTS_API_KEY,
     openai_api_base="https://llm.chutes.ai/v1",
     temperature=0.1 
